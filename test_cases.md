@@ -1,6 +1,6 @@
 # Alibi – Raste testi (v0.1)
 
-Raste të bazuara në Rastin 1 të nivelit 1 (shih `prototype/case1_answer_key.md`): 4 të dyshuar (A, B, D, E), 5 dhoma, 3 orë (20:00, 21:00, 22:00), dhoma e krimit = Biblioteka, ora e krimit = 21:00, buxhet 12.
+Raste të bazuara në Rastin 1 të nivelit 1 (shih `case1_answer_key.md`): 4 të dyshuar (A, B, D, E), 5 dhoma, 3 orë (20:00, 21:00, 22:00), dhoma e krimit = Biblioteka, ora e krimit = 21:00, buxhet 12.
 
 | ID | Lloji | Gjendja fillestare | Input | Rezultati i pritshëm |
 |---|---|---|---|---|
