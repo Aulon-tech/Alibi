@@ -41,8 +41,8 @@ In this game, murder mystery meets formal logical reasoning. Suspects don't tell
 | `state_model.md` | State variables, invariants and transitions |
 | `test_cases.md` | 10 test cases with expected results |
 | `core_loop.png` | Core gameplay loop diagram |
-| `prototype/paper_prototype.jpg` | Paper prototype board |
-| `prototype/case1_answer_key.md` | Verified answer key for Case 1 |
+| `paper_prototype.jpg` | Paper prototype board |
+| `case1_answer_key.md` | Verified answer key for Case 1 |
 | `playtest_note.md` | Playtest record |
 
 ## ✅ Validation
@@ -50,8 +50,6 @@ In this game, murder mystery meets formal logical reasoning. Suspects don't tell
 Paper playtest, 19 October 2026. Level 1, Case 2: four suspects, five rooms, three time slots, budget 12, par 6. The player identified the culprit correctly and reconstructed the contradiction chain.
 
 All three prototype cases are verified unique by script — the generator counts solutions and stops at the second; each returned exactly one valid hypothesis.
-
-Latest QA pass: `docs/qa_kalimi_verifikimit.pdf`.
 
 ## 🗺️ Roadmap
 

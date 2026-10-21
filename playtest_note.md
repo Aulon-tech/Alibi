@@ -7,8 +7,8 @@
 | Data | 19 tetor 2026 |
 | Kohëzgjatja | rreth 10 minuta |
 | Lojtare | Dea Berisha |
-| Drejtues | Nysret Ukaj, me çelësin e përgjigjeve |
-| Prototipi | `prototype/paper_prototype.jpg`, Rasti 2 i nivelit 1 |
+| Drejtues | Claude (asistent AI), me çelësin e përgjigjeve |
+| Prototipi | `paper_prototype.jpg`, Rasti 2 i nivelit 1 |
 | Konfigurimi | 4 të dyshuar, 5 dhoma, 3 orë, buxhet 12, par 6 |
 | Rasti | Krimi: Biblioteka, ora 3. Fajtorja: Drita, me një gënjeshtër të vetme — pretendimi se ishte në Sallon në orën 3. |
 
@@ -34,4 +34,35 @@ Rregulli D2 funksionoi siç ishte specifikuar: kur buxheti arriti 0, pyetjet u �
 
 ---
 
+## Seanca 2 — Java 5, me ekip tjetër
 
+> Ende e pakryer. Plotësohet vetëm me atë që ndodh realisht gjatë provës.
+
+| | |
+|---|---|
+| Data | ____ |
+| Ekipi testues | ____ |
+| Prototipi i provuar | ____ |
+| Drejtues nga ekipi ynë | ____ |
+| Kohëzgjatja | ____ min |
+
+### Pyetje pas lojës
+
+- A e kuptove çfarë duhej bërë pa shpjegim shtesë?
+- Çfarë do të thotë figura e plotë, e tejdukshme dhe dhoma e zbrazët?
+- A ishte buxheti i mjaftueshëm?
+- Kur e kuptove se kishe gjetur kontradiktën?
+- Çfarë të dukej e paqartë ose e panevojshme?
+
+### Evidenca
+
+| # | Vëzhgimi | Prova | Statusi |
+|---|---|---|---|
+| 1 | | | |
+| 2 | | | |
+
+### Vendimi
+
+- **Problemi:** ____
+- **Ndryshimi:** ____
+- **Statusi:** ☐ pranuar për GDD v1.1  ☐ refuzuar (arsyeja: ____)
