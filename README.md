@@ -58,3 +58,8 @@ All three prototype cases are verified unique by script — the generator counts
 - Input validation before the question budget is charged
 - Unity project: scenes, Deduction Board, question interface
 - Unit tests across the 10 cases in `test_cases.md`
+
+## Statusi
+Ne kod ekziston projekti Unity ne folderin AlibiUnity: Alibi.Core (C# pa UnityEngine), Alibi.Unity dhe skenat Alibi_MainMenu e Alibi_Game.
+U provua me 20 teste EditMode: kartat 1-3, TC-01 deri TC-10 dhe gjeneratori i rasteve.
+Mbetet: playtest me ekip tjeter, vendimi per Sabotimin ne nivelin 3 dhe nivelet 4-6.

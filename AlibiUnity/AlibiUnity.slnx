@@ -1,0 +1,8 @@
+﻿<Solution>
+  <Project Path="Alibi.Core.csproj" />
+  <Project Path="Alibi.Unity.csproj" />
+  <Project Path="Alibi.Editor.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="Alibi.Tests.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+</Solution>
