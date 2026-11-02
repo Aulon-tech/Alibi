@@ -5,7 +5,7 @@ namespace Alibi.Core
 {
     public enum QType { Q1 = 1, Q2 = 2, Q3 = 3, Q4 = 4, Q5 = 5 }
 
-    public enum CaseType { Vrasja, Sabotimi }
+    public enum CaseType { Vrasja, Sabotimi, Vjedhja }
 
     public enum Phase { CaseLoaded, Questioning, Accusing, Won, Lost, Abandoned }
 
@@ -149,6 +149,15 @@ namespace Alibi.Core
         public int WrongRoom;
     }
 
+    public sealed class PhysicalClue
+    {
+        public int Room = -1;
+        public string Title;
+        public string Text;
+        public bool RevealsSecret;
+        public bool Found;
+    }
+
     public sealed class TutorialStep
     {
         public string Title;
@@ -184,9 +193,15 @@ namespace Alibi.Core
         public int ErrorsAllowed;
         public bool IsGenerated;
         public List<MistakeSpec> Mistakes = new List<MistakeSpec>();
+        public List<PhysicalClue> PhysicalClues = new List<PhysicalClue>();
         public List<string> Rules = new List<string>();
         public List<TutorialStep> Tutorial = new List<TutorialStep>();
         public List<string> GeneratorNotes = new List<string>();
+
+        public bool SecretEdgeExists;
+        public bool SecretEdgeActive;
+        public int SecretA = -1;
+        public int SecretB = -1;
 
         public int PathCount;
         public int[] PathRooms;
@@ -196,7 +211,7 @@ namespace Alibi.Core
         public int T { get { return Hours.Length; } }
         public int N { get { return Suspects.Length; } }
         public int RoomCount { get { return Rooms.Length; } }
-        public bool CrimeTimeKnown { get { return Type == CaseType.Vrasja; } }
+        public bool CrimeTimeKnown { get { return Type != CaseType.Sabotimi; } }
 
         public int[] CrimeTimes
         {
@@ -226,9 +241,31 @@ namespace Alibi.Core
             return a == b || Adj[a, b];
         }
 
+        public bool IsSecretPair(int a, int b)
+        {
+            return SecretEdgeExists && ((a == SecretA && b == SecretB) || (a == SecretB && b == SecretA));
+        }
+
         public bool CanMove(int a, int b)
         {
-            return !UseGraph || Adjacent(a, b);
+            if (!UseGraph || a == b) return true;
+            if (Adj[a, b]) return true;
+            return SecretEdgeExists && SecretEdgeActive && IsSecretPair(a, b);
+        }
+
+        public bool CanMoveWorld(int a, int b)
+        {
+            if (!UseGraph || a == b) return true;
+            if (Adj[a, b]) return true;
+            return SecretEdgeExists && IsSecretPair(a, b);
+        }
+
+        public bool ActivateSecretEdge()
+        {
+            if (!SecretEdgeExists || SecretEdgeActive) return false;
+            SecretEdgeActive = true;
+            Prepare();
+            return true;
         }
 
         public int[] WorldPath(int s)
@@ -260,7 +297,7 @@ namespace Alibi.Core
                 int x = queue.Dequeue();
                 for (int y = 0; y < RoomCount; y++)
                 {
-                    if (y == x || !Adj[x, y] || dist[y] >= 0) continue;
+                    if (y == x || !CanMove(x, y) || dist[y] >= 0) continue;
                     dist[y] = dist[x] + 1;
                     if (y == b) return dist[y];
                     queue.Enqueue(y);
@@ -309,6 +346,12 @@ namespace Alibi.Core
         }
 
         public bool PathValid(int[] path)
+        {
+            for (int i = 1; i < path.Length; i++) if (!CanMoveWorld(path[i - 1], path[i])) return false;
+            return true;
+        }
+
+        public bool PathValidKnown(int[] path)
         {
             for (int i = 1; i < path.Length; i++) if (!CanMove(path[i - 1], path[i])) return false;
             return true;

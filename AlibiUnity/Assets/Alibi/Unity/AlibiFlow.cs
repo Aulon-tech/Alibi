@@ -95,13 +95,13 @@ namespace Alibi.Unity
 
         public static int NextCard()
         {
-            for (int k = 1; k <= 3; k++) if (!CardWon(k) && CardUnlocked(k)) return k;
-            return 3;
+            for (int k = 1; k <= 4; k++) if (!CardWon(k) && CardUnlocked(k)) return k;
+            return 4;
         }
 
         public static void ResetProgress()
         {
-            for (int k = 1; k <= 3; k++)
+            for (int k = 1; k <= 4; k++)
             {
                 PlayerPrefs.DeleteKey("alibi_card_" + k + "_won");
                 PlayerPrefs.DeleteKey("alibi_card_" + k + "_stars");

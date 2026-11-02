@@ -22,18 +22,20 @@ namespace Alibi.Unity
         int pickMode;
         int seed;
 
-        static readonly string[] ModeNames = { "Niveli 1 · Vrasja", "Niveli 2 · Vrasja", "Niveli 3 · Sabotimi" };
+        static readonly string[] ModeNames = { "Niveli 1 · Vrasja", "Niveli 2 · Vrasja", "Niveli 3 · Sabotimi", "Niveli 4 · Vjedhja" };
         static readonly string[] ModeDesc =
         {
             "4 të dyshuar, 5 dhoma, 3 orë, buxhet 12. Pa graf lëvizjeje.",
             "5 të dyshuar, 7 dhoma me graf, 4 orë, buxhet 12. Askush nuk teleportohet.",
-            "4 të dyshuar, 7 dhoma, 3 orë, buxhet 12. Ora e krimit nuk dihet: provo personin dhe orën."
+            "4 të dyshuar, 7 dhoma, 3 orë, buxhet 12. Ora e krimit nuk dihet: provo personin dhe orën.",
+            "6 të dyshuar, 9 dhoma, 5 orë, buxhet 10. Kalimi i fshehtë Biblioteka–Zyra (R06)."
         };
         static readonly string[] ModeNotes =
         {
             "Rast i shpejtë për të mësuar tabelën.",
             "Kush nuk arrin dot në dhomën e krimit me kalime përjashtohet (R02, R08).",
-            "Variant eksperimental: me parametrat e plotë të nivelit 3 (5 të dyshuar, 5 orë, buxhet 11) par-i i llogaritur del 18–25, prandaj ky variant është i ngushtuar."
+            "Variant eksperimental: me parametrat e plotë të nivelit 3 (5 të dyshuar, 5 orë, buxhet 11) par-i i llogaritur del 18–25, prandaj ky variant është i ngushtuar.",
+            "Karta 4 është e fiksuar (seed 404). Gjeneratori për Vjedhjen mbetet opsional."
         };
 
         void Start()
@@ -146,7 +148,7 @@ namespace Alibi.Unity
             var nextCase = LevelCards.Card(next);
             MenuButton(left, "Vazhdo", nextCase.Title + " · " + nextCase.Kicker.ToLowerInvariant(), true, () => AlibiFlow.StartCase(LevelCards.Card(next)), y);
             y += 84;
-            MenuButton(left, "Kartat e niveleve", "Progresioni: Faza 1 deri në Fazën 3, me zgjidhje të verifikuara", false, ShowCards, y);
+            MenuButton(left, "Kartat e niveleve", "Progresioni: Faza 1 deri në Fazën 4, me zgjidhje të verifikuara", false, ShowCards, y);
             y += 84;
             MenuButton(left, "Rast i ri", "Gjeneratori: raste të reja me zgjidhje të garantuar unike", false, ShowNewCase, y);
             y += 84;
@@ -160,7 +162,7 @@ namespace Alibi.Unity
             foot.anchoredPosition = new Vector2(64, 30);
             foot.sizeDelta = new Vector2(900, 70);
             var progress = new List<string>();
-            for (int k = 1; k <= 3; k++)
+            for (int k = 1; k <= 4; k++)
             {
                 string state = AlibiFlow.CardWon(k) ? AlibiFlow.BestStars(k) + "/3 yje" : AlibiFlow.CardUnlocked(k) ? "e hapur" : "e kyçur";
                 progress.Add("Karta " + k + ": " + state);
@@ -195,9 +197,9 @@ namespace Alibi.Unity
 
         void ShowCards()
         {
-            var body = FullPanel("KARTAT E NIVELEVE · PROGRESSION MAP", "Zgjidh kartën", "Tri karta me të njëjtën mekanikë. Vështirësia rritet përmes vendimeve, jo shpejtësisë: Faza 1 mëson tabelën, Faza 2 grafin e lëvizjes, Faza 3 dëshmitarin që gabon.");
-            float cw = 560, gap = 24, y = 160;
-            for (int k = 1; k <= 3; k++)
+            var body = FullPanel("KARTAT E NIVELEVE · PROGRESSION MAP", "Zgjidh kartën", "Katër karta me të njëjtën mekanikë. Vështirësia rritet përmes vendimeve: Faza 1 tabela, Faza 2 grafi, Faza 3 dëshmitari që gabon, Faza 4 kalimi i fshehtë.");
+            float cw = 420, gap = 18, y = 160;
+            for (int k = 1; k <= 4; k++)
             {
                 int card = k;
                 var c = LevelCards.Card(k);
@@ -207,29 +209,29 @@ namespace Alibi.Unity
                 UI.Place(box.rectTransform, (k - 1) * (cw + gap), y, cw, 430);
                 var r = box.transform;
                 UI.LabelAt(r, c.Kicker, Theme.Mono, 13, Theme.Gold, 22, 20, cw - 44, 18);
-                UI.LabelAt(r, "Karta " + k, Theme.Serif, 40, Theme.Parchment, 22, 42, cw - 44, 48);
-                UI.LabelAt(r, c.Title.Substring(c.Title.IndexOf('—') + 1).Trim(), Theme.SansSemi, 18, Theme.Text, 22, 92, cw - 44, 24);
+                UI.LabelAt(r, "Karta " + k, Theme.Serif, 36, Theme.Parchment, 22, 42, cw - 44, 48);
+                UI.LabelAt(r, c.Title.Substring(c.Title.IndexOf('—') + 1).Trim(), Theme.SansSemi, 17, Theme.Text, 22, 92, cw - 44, 24);
                 string config = c.N + " të dyshuar · " + c.RoomCount + " dhoma · " + c.T + " orë (" + c.Hours[0] + "–" + c.Hours[c.T - 1] + ") · buxhet " + c.Budget + " · par " + c.Par;
                 float iy = 124;
-                iy += Panels.Paragraph(r, config, Theme.Mono, 13, Theme.Text2, 22, iy, cw - 44) + 10;
-                iy += Panels.Paragraph(r, c.Objective, Theme.Sans, 15, Theme.Text2, 22, iy, cw - 44) + 10;
-                string skill = k == 1 ? "Aftësia: deklarata për vetveten nuk e përjashton dikë (R03, R04)." : k == 2 ? "Aftësia: koha + grafi — kush nuk arrin në dhomën e krimit përjashtohet (R02, R08)." : "Aftësia: mos beso çdo kontradiktë — duhen dy mbështetje të pavarura (R05).";
-                Panels.Paragraph(r, skill, Theme.Sans, 14, Theme.Muted, 22, iy, cw - 44);
+                iy += Panels.Paragraph(r, config, Theme.Mono, 12, Theme.Text2, 22, iy, cw - 44) + 10;
+                iy += Panels.Paragraph(r, c.Objective, Theme.Sans, 14, Theme.Text2, 22, iy, cw - 44) + 10;
+                string skill = k == 1 ? "Aftësia: deklarata për vetveten nuk e përjashton dikë (R03, R04)." : k == 2 ? "Aftësia: koha + grafi — kush nuk arrin në dhomën e krimit përjashtohet (R02, R08)." : k == 3 ? "Aftësia: mos beso çdo kontradiktë — duhen dy mbështetje të pavarura (R05)." : "Aftësia: kërko dhomën për provën fizike; kalimi Biblioteka–Zyra hapet me R06.";
+                Panels.Paragraph(r, skill, Theme.Sans, 13, Theme.Muted, 22, iy, cw - 44);
                 string status = won ? "E fituar · " + AlibiFlow.BestStars(k) + "/3 yje" : unlocked ? "E hapur" : "E kyçur · fito Kartën " + (k - 1);
-                UI.LabelAt(r, status, Theme.SansSemi, 15, won ? Theme.GoldText : unlocked ? Theme.Text : Theme.Muted, 22, 372, 300, 30, TextAnchor.MiddleLeft);
-                var play = UI.Button(r, unlocked ? "Luaj" : "E kyçur", unlocked ? BtnStyle.Primary : BtnStyle.Disabled, () => AlibiFlow.StartCase(LevelCards.Card(card)), 17, 10);
-                UI.PlaceRight(play.Rect, 22, 362, 140, 48);
+                UI.LabelAt(r, status, Theme.SansSemi, 14, won ? Theme.GoldText : unlocked ? Theme.Text : Theme.Muted, 22, 372, 240, 30, TextAnchor.MiddleLeft);
+                var play = UI.Button(r, unlocked ? "Luaj" : "E kyçur", unlocked ? BtnStyle.Primary : BtnStyle.Disabled, () => AlibiFlow.StartCase(LevelCards.Card(card)), 16, 10);
+                UI.PlaceRight(play.Rect, 18, 362, 120, 48);
                 play.SetInteractable(unlocked);
             }
             y += 450;
-            float lw = (3 * cw + 2 * gap - 2 * gap) / 3f;
-            for (int i = 3; i < 6; i++)
+            float lw = (4 * cw + 3 * gap - gap) / 2f;
+            for (int i = 4; i < 6; i++)
             {
                 var spec = LevelCards.Levels[i];
                 var box = UI.Card(body, "Level" + spec.Level, new Color(0.07f, 0.08f, 0.1f, 0.9f), Theme.Line, 12);
-                UI.Place(box.rectTransform, (i - 3) * (lw + gap), y, lw, 96);
+                UI.Place(box.rectTransform, (i - 4) * (lw + gap), y, lw, 96);
                 UI.LabelAt(box.transform, "Niveli " + spec.Level + " · " + spec.Name, Theme.SansSemi, 17, Theme.Text2, 18, 14, lw - 36, 24);
-                UI.LabelAt(box.transform, spec.Unlocks + " Jashtë kësaj demoje; hapet pas Kartës 3.", Theme.Sans, 13, Theme.Muted, 18, 42, lw - 36, 44);
+                UI.LabelAt(box.transform, spec.Unlocks + " Jashtë kësaj demoje; hapet pas Kartës 4.", Theme.Sans, 13, Theme.Muted, 18, 42, lw - 36, 44);
             }
             y += 116;
             var unlock = UI.Button(body, AlibiFlow.UnlockAll ? "Demo: të gjitha kartat të hapura" : "Demo: hap të gjitha kartat", AlibiFlow.UnlockAll ? BtnStyle.ChipOn : BtnStyle.Ghost, () =>
@@ -249,8 +251,8 @@ namespace Alibi.Unity
         void ShowNewCase()
         {
             var body = FullPanel("RAST I RI · CASEGENERATOR", "Gjenero një rast", "Gjeneratori ndërton të vërtetën, zgjedh gënjeshtrën e fajtorit (LieSelector), kontrollon me zgjidhës që rasti të ketë saktësisht një zgjidhje dhe llogarit par-in me ParPolicy. Rastet me defekt refuzohen dhe hapet vetë seed-i tjetër.");
-            float cw = 560, gap = 24, y = 170;
-            for (int i = 0; i < 3; i++)
+            float cw = 420, gap = 18, y = 170;
+            for (int i = 0; i < 4; i++)
             {
                 int mode = i;
                 bool on = pickMode == i;
@@ -260,21 +262,21 @@ namespace Alibi.Unity
                     ShowNewCase();
                 }, 16, 14);
                 UI.Place(b.Rect, i * (cw + gap), y, cw, 230);
-                UI.LabelAt(b.Rect, ModeNames[i], Theme.Serif, 32, Theme.Parchment, 22, 20, cw - 44, 40);
-                float iy = 70;
-                iy += Panels.Paragraph(b.Rect, ModeDesc[i], Theme.Sans, 16, Theme.Text, 22, iy, cw - 44) + 10;
-                Panels.Paragraph(b.Rect, ModeNotes[i], Theme.Sans, 14, Theme.Muted, 22, iy, cw - 44);
-                if (i == 2)
+                UI.LabelAt(b.Rect, ModeNames[i], Theme.Serif, 28, Theme.Parchment, 18, 18, cw - 36, 40);
+                float iy = 66;
+                iy += Panels.Paragraph(b.Rect, ModeDesc[i], Theme.Sans, 15, Theme.Text, 18, iy, cw - 36) + 8;
+                Panels.Paragraph(b.Rect, ModeNotes[i], Theme.Sans, 13, Theme.Muted, 18, iy, cw - 36);
+                if (i == 2 || i == 3)
                 {
                     var tag = UI.Card(b.Rect, "Tag", new Color(0, 0, 0, 0), Theme.WithAlpha(Theme.Gold, 0.6f), 12);
-                    UI.PlaceRight(tag.rectTransform, 20, 26, 130, 26);
-                    var tt = UI.Label(tag.transform, "eksperimental", Theme.Sans, 13, Theme.GoldText, TextAnchor.MiddleCenter);
+                    UI.PlaceRight(tag.rectTransform, 16, 22, i == 2 ? 130 : 100, 26);
+                    var tt = UI.Label(tag.transform, i == 2 ? "eksperimental" : "karta 4", Theme.Sans, 13, Theme.GoldText, TextAnchor.MiddleCenter);
                     UI.Stretch(tt.rectTransform, 0, 0, 0, 0);
                 }
             }
             y += 256;
             var seedBox = UI.Card(body, "Seed", Theme.Panel, Theme.Line, 12);
-            UI.Place(seedBox.rectTransform, 0, y, 3 * cw + 2 * gap, 86);
+            UI.Place(seedBox.rectTransform, 0, y, 4 * cw + 3 * gap, 86);
             UI.LabelAt(seedBox.transform, "SEED", Theme.Mono, 13, Theme.Muted, 22, 14, 200, 18);
             UI.LabelAt(seedBox.transform, seed.ToString(), Theme.Mono, 30, Theme.Parchment, 22, 36, 200, 40);
             var reroll = UI.Button(seedBox.transform, "Seed i ri", BtnStyle.Ghost, () =>
@@ -290,6 +292,11 @@ namespace Alibi.Unity
 
         void StartGeneration()
         {
+            if (pickMode == 3)
+            {
+                AlibiFlow.StartCase(LevelCards.Card4());
+                return;
+            }
             int level = pickMode == 0 ? 1 : pickMode == 1 ? 2 : 3;
             var type = pickMode == 2 ? CaseType.Sabotimi : CaseType.Vrasja;
             int s = seed;

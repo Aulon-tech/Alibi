@@ -4,62 +4,61 @@
 
 An algorithmic murder mystery game where logic is your only weapon. Every case is procedurally generated with a guaranteed unique solution and a provable deduction path.
 
-Group 6 — Dea Berisha, Nysret Ukaj, Aulon Miftari, Enis Dapko
-Game Development · FSHMN · University of Prishtina
+Group 6 — Dea Berisha, Nysret Ukaj, Aulon Miftari, Enis Dapko  
+Extension — Level 4 **Kalimi** (Vjedhja + secret passage Biblioteka–Zyra)
 
-**Status:** design phase. The specification is complete and validated against a paper prototype; the engine is not yet implemented.
+## What's new: Level 4 · Kalimi
 
-## 🧩 Core Concept
+| | |
+|---|---|
+| Card | **Karta 4** (seed 404) |
+| Type | **Vjedhja** |
+| Setup | 6 suspects, 9 rooms, 5 hours, budget 10, par 7 |
+| Unlock | Secret passage **Biblioteka–Zyra** via physical search (R06) |
+| Culprit | Fatmiri |
 
-In this game, murder mystery meets formal logical reasoning. Suspects don't tell emotional stories—they generate **logical constraints**. Instead of guessing, players question suspects, log statements onto a dynamic **Deduction Board**, and cross-reference constraint sets to catch lies and isolate the single guilty party.
+Play the documented route in `case4_answer_key.md`. Cards 1–3 are unchanged and still unique.
 
-## ⚙️ Algorithmic Engine
+## Play in the browser (this repo)
 
-* **Procedural Case Generation:** Uses constraint propagation (**Arc Consistency / AC-3**) combined with backtracking search to generate solvable cases on the fly.
-* **Dynamic Difficulty Tuning:** Case complexity is determined dynamically by measuring the number of propagation steps required by the solver to reach a unique solution.
-* **Verifiable Proof Chains:** The engine verifies the player's final accusation by checking the validity of their contradiction chain.
+```bash
+export DOTNET_ROOT="$HOME/.dotnet"   # if you used the install script
+export PATH="$PATH:$DOTNET_ROOT"
+cd play
+dotnet run -c Release --urls http://127.0.0.1:43123
+```
 
-## 🎮 Core Mechanics & Rules
+Open [http://127.0.0.1:43123](http://127.0.0.1:43123). The UI talks to `Alibi.Core` (same engine as Unity).
 
-* **Spatial & Temporal Grid:** Every suspect occupies exactly one room per time slot.
-* **Corroboration:** Two people in the same room at the same time confirm each other's presence.
-* **Physical Evidence:** Provides immutable hard constraints that cannot be lied about or altered.
-* **Lie Detection:** Honest suspects always state true constraints. Exactly one suspect (the culprit) can lie, producing isolated contradictions in the overall constraint matrix.
-* **Question Budget:** Players have a fixed question quota that shrinks as difficulty increases, requiring optimal information-gathering strategy.
+## Unity project
 
-## 🏆 Victory & Defeat
+See `AlibiUnity/Assets/Alibi/README.md`. Open in Unity 2022.3 LTS / Unity 6, create scenes via **Alibi > Krijo skenat**, then Play. Karta 4 appears in the level map after Karta 3.
 
-* **Win Condition:** Correctly identify the culprit alongside the supporting logical contradiction chain.
-* **Lose Condition:** Run out of the question budget or accuse the wrong suspect.
+## Verify Core
 
-## 📐 Specification
+```bash
+cd tools/AlibiVerify
+dotnet run -c Release
+```
+
+## Spec docs
 
 | File | Contents |
 |---|---|
-| `GDD_v0.1.pdf` | Game design document, 9 pages |
-| `rules_table.md` | Rules R01–R13 in WHEN/IF … THEN form |
-| `state_model.md` | State variables, invariants and transitions |
-| `test_cases.md` | 10 test cases with expected results |
-| `core_loop.png` | Core gameplay loop diagram |
-| `paper_prototype.jpg` | Paper prototype board |
-| `case1_answer_key.md` | Verified answer key for Case 1 |
-| `playtest_note.md` | Playtest record |
+| `rules_table.md` | Rules R01–R13 |
+| `state_model.md` | State variables (levels 1–6) |
+| `case1_answer_key.md` | Level 1 key |
+| `case4_answer_key.md` | Level 4 key |
+| `test_cases.md` | TC-01…TC-10 |
 
-## ✅ Validation
+## Levels
 
-Paper playtest, 19 October 2026. Level 1, Case 2: four suspects, five rooms, three time slots, budget 12, par 6. The player identified the culprit correctly and reconstructed the contradiction chain.
-
-All three prototype cases are verified unique by script — the generator counts solutions and stops at the second; each returned exactly one valid hypothesis.
-
-## 🗺️ Roadmap
-
-- `Alibi.Core` in C#, independent of UnityEngine: case generator, AC-3, RuleEngine, ParPolicy
-- Contradiction feedback when two constraints conflict
-- Input validation before the question budget is charged
-- Unity project: scenes, Deduction Board, question interface
-- Unit tests across the 10 cases in `test_cases.md`
+1. Mësimi — Vrasja, no movement graph  
+2. Lëvizja — movement graph  
+3. Sabotimi / Card 3 — honest witness error (R05)  
+4. **Kalimi — Vjedhja + secret edge (R06)** ← shipped  
+5–6. Still locked (refusals / endless generation)
 
 ## Statusi
-Ne kod ekziston projekti Unity ne folderin AlibiUnity: Alibi.Core (C# pa UnityEngine), Alibi.Unity dhe skenat Alibi_MainMenu e Alibi_Game.
-U provua me 20 teste EditMode: kartat 1-3, TC-01 deri TC-10 dhe gjeneratori i rasteve.
-Mbetet: playtest me ekip tjeter, vendimi per Sabotimin ne nivelin 3 dhe nivelet 4-6.
+
+Unity + `Alibi.Core` janë në `AlibiUnity/`. Kartat 1–4 janë të verifikuara (unike + rrugë e dokumentuar). Demo në shfletues: `play/` (porta 43123). Mbetet: nivelet 5–6 dhe vendimi për Sabotimin e plotë.

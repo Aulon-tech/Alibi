@@ -419,7 +419,7 @@ namespace Alibi.Unity
             iy += Panels.Paragraph(root, "Pozicionet e vërteta janë tani në vilë. Lëviz kohën për t'i parë orë pas ore. 3 yje deri në par+1 · 2 yje deri në par+3 · 1 yll më shumë.", Theme.Sans, 13, Theme.ParchMuted, pad, iy, iw) + 12;
             var retry = UI.Button(root, "Provo përsëri · seed " + C.Seed, BtnStyle.Parchment, gm.Restart, 16, 10);
             UI.Place(retry.Rect, pad, iy, 250, 48);
-            string nextLabel = won && C.CardNumber > 0 && C.CardNumber < 3 ? "Karta " + (C.CardNumber + 1) : "Menyja kryesore";
+            string nextLabel = won && C.CardNumber > 0 && C.CardNumber < 4 ? "Karta " + (C.CardNumber + 1) : "Menyja kryesore";
             var next = UI.Button(root, nextLabel, BtnStyle.ParchmentGhost, gm.AfterResult, 16, 10);
             UI.Place(next.Rect, pad + 262, iy, 220, 48);
             iy += 48 + 22;
@@ -433,7 +433,8 @@ namespace Alibi.Unity
             var root = card.transform;
             float w = 1060, pad = 40, iw = w - pad * 2, iy = 34;
             UI.LabelAt(root, (C.Kicker ?? "") + "  ·  SEED " + C.Seed, Theme.Mono, 13, Theme.ParchMuted, pad, iy, iw, 18);
-            Panels.Stamp(root, C.Type == CaseType.Vrasja ? "VRASJE" : "SABOTIM", Theme.Hex("#A3352C"), w - pad - 150, iy);
+            string stamp = C.Type == CaseType.Vrasja ? "VRASJE" : C.Type == CaseType.Vjedhja ? "VJEDHJE" : "SABOTIM";
+            Panels.Stamp(root, stamp, Theme.Hex("#A3352C"), w - pad - 150, iy);
             iy += 24;
             UI.LabelAt(root, C.Title, Theme.Serif, 42, Theme.ParchInk, pad, iy, iw - 180, 50);
             iy += 58;

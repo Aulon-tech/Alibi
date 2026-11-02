@@ -58,7 +58,9 @@ namespace Alibi.Unity
             new RoomLayout("DN", 7, 3, 10, 6, 0, "walnut"),
             new RoomLayout("KU", 7, 0, 10, 3, 0, "tile"),
             new RoomLayout("SH", 0, 0, 3, 3, 0, "stairs"),
-            new RoomLayout("KO", -3.6f, 0, 0, 3, UpperFloor, "runner")
+            new RoomLayout("KO", -3.6f, 0, 0, 3, UpperFloor, "runner"),
+            new RoomLayout("ZY", -3.6f, 3, 0, 6, UpperFloor, "desk"),
+            new RoomLayout("BO", 0, -3.2f, 3, 0, -1.35f, "stone")
         };
 
         public static readonly DoorLayout[] Doors =
@@ -69,7 +71,9 @@ namespace Alibi.Unity
             new DoorLayout("SA", "BI", true, 3, 4, 5),
             new DoorLayout("SA", "DN", true, 7, 4, 5),
             new DoorLayout("KU", "DN", false, 3, 8, 9),
-            new DoorLayout("SH", "KO", true, 0, 1, 2)
+            new DoorLayout("SH", "KO", true, 0, 1, 2),
+            new DoorLayout("KO", "ZY", false, 3, -2.4f, -1.2f),
+            new DoorLayout("SH", "BO", false, 0, 0.8f, 2.2f)
         };
 
         public static RoomLayout Layout(string id)

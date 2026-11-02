@@ -311,14 +311,61 @@ namespace Alibi.Tests
         [Test]
         public void KartatKaneZgjidhjeUnike()
         {
-            for (int k = 1; k <= 3; k++)
+            for (int k = 1; k <= 4; k++)
             {
                 var c = LevelCards.Card(k);
                 int solutions;
-                Assert.IsTrue(CaseGenerator.IsUnique(c, new CspSolver(c), out solutions), "Karta " + k);
+                Assert.IsTrue(CaseGenerator.IsUniqueAllowingSecret(c, out solutions), "Karta " + k);
                 for (int s = 0; s < c.N; s++) Assert.IsTrue(c.PathValid(c.Truth[s]), "rruga e " + c.Suspects[s].Name);
                 Assert.IsTrue(c.PathValid(c.Cover));
             }
+        }
+
+        [Test]
+        public void Karta4_KalimiIFshehteDheZgjidhja()
+        {
+            var c = LevelCards.Card4();
+            Assert.AreEqual(CaseType.Vjedhja, c.Type);
+            Assert.IsTrue(c.SecretEdgeExists);
+            Assert.IsFalse(c.SecretEdgeActive);
+            Assert.AreEqual(6, c.N);
+            Assert.AreEqual(9, c.RoomCount);
+            Assert.AreEqual(10, c.Budget);
+            Assert.IsFalse(c.PathValidKnown(c.Truth[c.Culprit]));
+
+            var g = new GameSession(c);
+            int bi = c.RoomIndex("BI");
+            int zy = c.RoomIndex("ZY");
+            Assert.IsTrue(g.SearchRoom(bi).Accepted);
+            Assert.IsTrue(g.Case.SecretEdgeActive);
+            Ask(g, "E", QType.Q1, 1);
+            Assert.AreEqual("Me mua ishte Fatmiri.", Ask(g, "E", QType.Q4, 1).Statement.Text);
+            var lie = Ask(g, "F", QType.Q1, 1);
+            Assert.IsNotNull(lie.Conflict);
+            Ask(g, "A", QType.Q1, 2);
+            Ask(g, "A", QType.Q4, 2);
+            Ask(g, "A", QType.Q2, -1, "ZY");
+            Assert.AreEqual("F", Names(g));
+            var r = g.Accuse(g.Case.SuspectIndex("F"), zy, 2);
+            Assert.IsTrue(r.Accepted);
+            Assert.AreEqual(Phase.Won, g.Phase);
+        }
+
+        [Test]
+        public void TC10_SecretEdgeR06()
+        {
+            var g = new GameSession(LevelCards.Card4());
+            int bi = g.Case.RoomIndex("BI");
+            int zy = g.Case.RoomIndex("ZY");
+            Assert.IsFalse(g.Case.CanMove(bi, zy));
+            var miss = g.SearchRoom(g.Case.RoomIndex("HO"));
+            Assert.IsTrue(miss.Accepted);
+            Assert.IsFalse(g.Case.SecretEdgeActive);
+            var found = g.SearchRoom(bi);
+            Assert.IsTrue(found.Accepted);
+            Assert.IsTrue(g.Case.SecretEdgeActive);
+            Assert.IsTrue(g.Case.CanMove(bi, zy));
+            Assert.AreEqual(8, g.Remaining);
         }
     }
 }
