@@ -203,7 +203,8 @@ namespace Alibi.Unity
             UI.StretchBottom(line.rectTransform, 0, 0, 0, 1);
             UI.LabelAt(barHost, "ALIBI", Theme.Serif, 34, Theme.Parchment, 24, 18, 130, 40);
             string title = caseDef.Title;
-            string sub = (caseDef.Type == CaseType.Vrasja ? "Vrasja" : "Sabotimi") + " · Vila · Niveli " + caseDef.Level + " · seed " + caseDef.Seed + (Session.IsOver ? " · rasti u mbyll" : "");
+            string typeName = caseDef.Type == CaseType.Vrasja ? "Vrasja" : caseDef.Type == CaseType.Vjedhja ? "Vjedhja" : "Sabotimi";
+            string sub = typeName + " · Vila · Niveli " + caseDef.Level + " · seed " + caseDef.Seed + (Session.IsOver ? " · rasti u mbyll" : "");
             var t1 = UI.LabelAt(barHost, title, Theme.SansSemi, 17, Theme.Text, 150, 14, 520, 24);
             t1.horizontalOverflow = HorizontalWrapMode.Overflow;
             var t2 = UI.LabelAt(barHost, sub, Theme.Mono, 13, Theme.Muted, 150, 42, 520, 20);
@@ -321,14 +322,50 @@ namespace Alibi.Unity
                 if (caseDef.UseGraph)
                 {
                     var links = new List<string>();
-                    for (int r = 0; r < caseDef.RoomCount; r++) if (r != selectedRoom && caseDef.Adj[selectedRoom, r]) links.Add(caseDef.Rooms[r].Name);
-                    var lt = UI.LabelAt(root, "Lidhet me: " + string.Join(", ", links.ToArray()), Theme.Sans, 12, Theme.Muted, 14, iy + 4, 272, 20);
+                    for (int r = 0; r < caseDef.RoomCount; r++)
+                    {
+                        if (r == selectedRoom) continue;
+                        if (caseDef.CanMove(selectedRoom, r) && selectedRoom != r) links.Add(caseDef.Rooms[r].Name);
+                    }
+                    var lt = UI.LabelAt(root, "Lidhet me: " + (links.Count == 0 ? "—" : string.Join(", ", links.ToArray())), Theme.Sans, 12, Theme.Muted, 14, iy + 4, 272, 20);
                     iy += UI.FitHeight(lt, 272) + 6;
+                }
+                if (!Truth && caseDef.PhysicalClues.Count > 0 && Session.Remaining > 0)
+                {
+                    bool already = false;
+                    foreach (var pc in Session.FoundClues) if (pc.Room == selectedRoom) already = true;
+                    foreach (var pc in caseDef.PhysicalClues) if (pc.Room == selectedRoom && pc.Found) already = true;
+                    var search = UI.Button(root, already ? "E kërkuar" : "Kërko dhomën · −1", already || Session.IsOver ? BtnStyle.Disabled : BtnStyle.Chip, () => SearchSelectedRoom(), 14, 8);
+                    UI.Place(search.Rect, 14, iy + 4, 272, 40);
+                    search.SetInteractable(!already && !Session.IsOver && Session.Remaining > 0);
+                    iy += 50;
                 }
                 iy += 8;
             }
             UI.Stretch(card.rectTransform, 0, 0, 0, 0);
             roomCardHost.sizeDelta = new Vector2(300, iy);
+        }
+
+        public void SearchSelectedRoom()
+        {
+            if (selectedRoom < 0) return;
+            var outcome = Session.SearchRoom(selectedRoom);
+            if (!outcome.Accepted)
+            {
+                Panels.Toast(canvas.transform, outcome.Message, Theme.Red, 3f);
+                if (outcome.BudgetExhausted) OpenAccusation();
+                RefreshAll();
+                return;
+            }
+            LastOutcome = outcome;
+            board.Refresh(currentTime, Truth);
+            RefreshAll();
+            Panels.Toast(canvas.transform, outcome.Message, caseDef.SecretEdgeActive ? Theme.Gold : Theme.Text, 4f);
+            if (outcome.BudgetExhausted)
+            {
+                Panels.Toast(canvas.transform, "Buxheti mbaroi. Duhet të akuzosh.", Theme.Gold, 3.5f);
+                OpenAccusation();
+            }
         }
 
         void BuildTabs()
@@ -636,7 +673,7 @@ namespace Alibi.Unity
 
         public void AfterResult()
         {
-            if (Session.Phase == Phase.Won && caseDef.CardNumber > 0 && caseDef.CardNumber < 3)
+            if (Session.Phase == Phase.Won && caseDef.CardNumber > 0 && caseDef.CardNumber < 4)
             {
                 AlibiFlow.StartCase(LevelCards.Card(caseDef.CardNumber + 1));
                 return;

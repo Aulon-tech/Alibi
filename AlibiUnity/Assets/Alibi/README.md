@@ -17,7 +17,7 @@ Nese e shtyp Play ne `SampleScene` pa i krijuar skenat, demo hapet prape aty.
 
 ## Cka permban demo
 
-Menyja ka Vazhdo, Kartat e niveleve, Rast i ri, Si luhet dhe Dil. Kartat 1, 2 dhe 3 jane sakte si ne PBT4 (te dyshuarit, dhomat, oret, buxheti, krimi, par-i) dhe hapen njera pas tjetres; per demo ka butonin "hap te gjitha kartat". Karta 1 ka udhezuesin hap pas hapi. Rast i ri gjeneron raste me seed per nivelin 1, nivelin 2 dhe Sabotimin, i kontrollon me zgjidhes qe te kene vetem nje zgjidhje dhe e llogarit par-in me ParPolicy.
+Menyja ka Vazhdo, Kartat e niveleve, Rast i ri, Si luhet dhe Dil. Kartat 1–4 jane te verifikuara (te dyshuarit, dhomat, oret, buxheti, krimi, par-i) dhe hapen njera pas tjetres; per demo ka butonin "hap te gjitha kartat". Karta 1 ka udhezuesin hap pas hapi. Karta 4 (Kalimi) shton Vjedhjen, Zyre/Bodrum, Gentën dhe kalimin e fshehtë Biblioteka–Zyra (R06, butoni «Kërko dhomën»). Rast i ri gjeneron raste me seed per nivelin 1, nivelin 2 dhe Sabotimin; Karta 4 hapet si rast fiks (seed 404).
 
 Ne loje: vila 3D me figurat (e plote = e konfirmuar, e tejdukshme = e mundshme, zhduket = e perjashtuar), slider-i i kohes, pyetjet Q1–Q5 me kosto, buxheti, tabela e deduksionit qe perditesohet vete (AC-3), dosja e deshmive, kontradikta e theksuar (D9), input i strukturuar (D10), akuza me person + dhome + ore, fitorja me yje dhe zinxhirin e kufizimeve, humbja me kufizimin qe e perjashtonte akuzen dhe pozicionet e verteta ne vile, "Provo perseri" me te njejtin seed (T11) dhe dalja pa akuze si ABANDONED (T10).
 
@@ -26,7 +26,7 @@ Ne loje: vila 3D me figurat (e plote = e konfirmuar, e tejdukshme = e mundshme, 
 - `Core/` – Model, QuestionEngine, CspSolver (AC-3 + backtracking per cdo hipoteze fajtori, edhe me deshmitar qe gabon nje here), DomainMatrix, GameSession (gjendjet CASE_LOADED deri ABANDONED), CaseGenerator, LieSelector, ParPolicy, LevelCards.
 - `Unity/` – GameManager, MapBuilder, RoomView, SuspectMarker, DeductionBoardView, PropagationAnimator, TimelineController, InterrogationPanel, CameraRig, MainMenuController dhe panelet e UI.
 - `Editor/` – AlibiSetup (krijon skenat, Build Settings dhe materialin per URP ose Built-in).
-- `Tests/` – 20 teste EditMode: kartat 1–3 sipas zgjidhjes se dokumentuar, TC-01 deri TC-10, yjet, unikesia e gjeneratorit dhe zbulimi i rastit me defekt.
+- `Tests/` – EditMode: kartat 1–4 sipas zgjidhjes se dokumentuar (përfshi R06 / TC-10), TC-01 deri TC-10, yjet, unikesia e gjeneratorit dhe zbulimi i rastit me defekt.
 - `Resources/AlibiFonts/` – Inter, Cormorant Garamond dhe JetBrains Mono (licenca OFL).
 
 ## Testet

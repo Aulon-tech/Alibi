@@ -151,6 +151,32 @@ namespace Alibi.Core
             return ev.ViableCount == 1 && ev.ViableK[0] == c.Culprit && ev.ViableTau[0] == c.CrimeTime;
         }
 
+        /// <summary>
+        /// For cases with a secret edge, uniqueness is judged on the true villa graph
+        /// (secret open). Gameplay still starts with the edge hidden until R06.
+        /// </summary>
+        public static bool IsUniqueAllowingSecret(CaseDefinition c, out int solutions)
+        {
+            bool was = c.SecretEdgeActive;
+            if (c.SecretEdgeExists && !c.SecretEdgeActive)
+            {
+                c.SecretEdgeActive = true;
+                c.Prepare();
+            }
+            try
+            {
+                return IsUnique(c, new CspSolver(c), out solutions);
+            }
+            finally
+            {
+                if (c.SecretEdgeExists && c.SecretEdgeActive != was)
+                {
+                    c.SecretEdgeActive = was;
+                    c.Prepare();
+                }
+            }
+        }
+
         public static GenerationResult Generate(int level, CaseType type, int seed, int maxAttempts = 80)
         {
             var spec = LevelCards.SpecFor(level, type);
@@ -358,6 +384,12 @@ namespace Alibi.Core
                 c.Title = "Sabotimi në " + room.Loc;
                 c.Objective = "Gjej kush e bëri dhe kur: personi dhe ora duhen provuar.";
                 c.Premise = "Dikush sabotoi sistemin e alarmit në " + room.Loc + " gjatë mbrëmjes. Ora e sabotimit nuk dihet.";
+            }
+            else if (type == CaseType.Vjedhja)
+            {
+                c.Title = "Vjedhja në " + room.Loc;
+                c.Objective = "Gjej kush e vodhi dhe akuzo me provë — person, dhomë dhe orë.";
+                c.Premise = "Një dosje u zhduk nga " + room.Loc + " në " + c.Hours[c.CrimeTime] + ". Kalimi i fshehtë mund të jetë i rëndësishëm.";
             }
             else
             {

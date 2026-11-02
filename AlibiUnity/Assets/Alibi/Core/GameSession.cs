@@ -65,11 +65,12 @@ namespace Alibi.Core
     public sealed class GameSession
     {
         public readonly CaseDefinition Case;
-        public readonly CspSolver Solver;
+        public CspSolver Solver { get; private set; }
         public readonly DomainMatrix Domains = new DomainMatrix();
         public readonly List<Statement> Statements = new List<Statement>();
         public readonly HashSet<int> Flagged = new HashSet<int>();
         public readonly List<Conflict> Conflicts = new List<Conflict>();
+        public readonly List<PhysicalClue> FoundClues = new List<PhysicalClue>();
         public Phase Phase { get; private set; }
         public int Spent { get; private set; }
         public EvalResult Eval { get; private set; }
@@ -86,6 +87,13 @@ namespace Alibi.Core
             Solver = new CspSolver(c);
             Phase = Phase.CaseLoaded;
             Eval = Solver.Evaluate(Statements);
+            Domains.Update(Eval);
+        }
+
+        void RebuildSolver(EvalResult before)
+        {
+            Solver = new CspSolver(Case);
+            Eval = Solver.Evaluate(Statements, before);
             Domains.Update(Eval);
         }
 
@@ -185,6 +193,72 @@ namespace Alibi.Core
             outcome.Accepted = true;
             outcome.Statement = st;
             outcome.Conflict = conflict;
+            if (Remaining <= 0)
+            {
+                Phase = Phase.Accusing;
+                ForcedAccusation = true;
+                outcome.BudgetExhausted = true;
+            }
+            return outcome;
+        }
+
+        public AskOutcome SearchRoom(int room)
+        {
+            var outcome = new AskOutcome();
+            if (IsOver)
+            {
+                outcome.Message = "Rasti është mbyllur.";
+                return outcome;
+            }
+            if (Remaining <= 0)
+            {
+                Phase = Phase.Accusing;
+                ForcedAccusation = true;
+                outcome.Message = "Buxheti mbaroi. Duhet të akuzosh.";
+                outcome.BudgetExhausted = true;
+                return outcome;
+            }
+            if (room < 0 || room >= Case.RoomCount)
+            {
+                outcome.Message = "Dhomë e pavlefshme";
+                return outcome;
+            }
+            Begin();
+            if (Phase == Phase.Accusing && !ForcedAccusation) Phase = Phase.Questioning;
+            PhysicalClue clue = null;
+            foreach (var pc in Case.PhysicalClues)
+            {
+                if (pc.Room == room && !pc.Found) { clue = pc; break; }
+            }
+            Spent += 1;
+            var before = Eval;
+            if (clue == null)
+            {
+                outcome.Accepted = true;
+                outcome.Message = "Nuk gjen asgjë të re në " + Case.Rooms[room].Loc + ".";
+                if (Remaining <= 0)
+                {
+                    Phase = Phase.Accusing;
+                    ForcedAccusation = true;
+                    outcome.BudgetExhausted = true;
+                }
+                return outcome;
+            }
+            clue.Found = true;
+            FoundClues.Add(clue);
+            bool rebuilt = false;
+            if (clue.RevealsSecret && Case.ActivateSecretEdge())
+            {
+                RebuildSolver(before);
+                rebuilt = true;
+            }
+            else
+            {
+                Eval = Solver.Evaluate(Statements, before);
+                Domains.Update(Eval);
+            }
+            outcome.Accepted = true;
+            outcome.Message = clue.Title + ": " + clue.Text + (rebuilt ? " Grafi i lëvizjes u përditësua (R06)." : "");
             if (Remaining <= 0)
             {
                 Phase = Phase.Accusing;

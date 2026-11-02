@@ -27,12 +27,15 @@ namespace Alibi.Core
             new RoomInfo("KU", "Kuzhina", "Kuzhinë"),
             new RoomInfo("DN", "Dhoma e ngrënies", "Dhomën e ngrënies"),
             new RoomInfo("SH", "Shkallët", "Shkallë"),
-            new RoomInfo("KO", "Korridori", "Korridor")
+            new RoomInfo("KO", "Korridori", "Korridor"),
+            new RoomInfo("ZY", "Zyra", "Zyrë"),
+            new RoomInfo("BO", "Bodrumi", "Bodrum")
         };
 
         public static readonly string[,] Edges =
         {
-            { "HO", "SA" }, { "HO", "KU" }, { "HO", "SH" }, { "SA", "BI" }, { "SA", "DN" }, { "KU", "DN" }, { "SH", "KO" }
+            { "HO", "SA" }, { "HO", "KU" }, { "HO", "SH" }, { "SA", "BI" }, { "SA", "DN" }, { "KU", "DN" }, { "SH", "KO" },
+            { "KO", "ZY" }, { "SH", "BO" }
         };
 
         public static readonly SuspectInfo[] AllSuspects =
@@ -41,7 +44,8 @@ namespace Alibi.Core
             new SuspectInfo("B", "Blerimi", "Blerimi", "Blerimin", "shofer", "#D08B3A"),
             new SuspectInfo("D", "Drita", "Drita", "Dritën", "sekretare", "#A785E0"),
             new SuspectInfo("E", "Elmazi", "Elmazi", "Elmazin", "kopshtar", "#5B9BD5"),
-            new SuspectInfo("F", "Fatmiri", "Fatmiri", "Fatmirin", "nipi i pronarit", "#D9667A")
+            new SuspectInfo("F", "Fatmiri", "Fatmiri", "Fatmirin", "nipi i pronarit", "#D9667A"),
+            new SuspectInfo("G", "Genta", "Genta", "Gentën", "ekonomiste", "#C4A35A")
         };
 
         public static RoomInfo Room(string id)
@@ -99,7 +103,20 @@ namespace Alibi.Core
                     if (c.Adj[a, b]) parts.Add(c.Rooms[a].Name + "–" + c.Rooms[b].Name);
                 }
             }
+            if (c.SecretEdgeExists && c.SecretEdgeActive)
+            {
+                parts.Add(c.Rooms[c.SecretA].Name + "–" + c.Rooms[c.SecretB].Name + " (i zbuluar)");
+            }
             return string.Join(", ", parts.ToArray());
+        }
+
+        public static void SetSecretEdge(CaseDefinition c, string a, string b)
+        {
+            c.SecretA = c.RoomIndex(a);
+            c.SecretB = c.RoomIndex(b);
+            if (c.SecretA < 0 || c.SecretB < 0) throw new ArgumentException("Kalimi i fshehtë kërkon dhoma të pranishme: " + a + ", " + b);
+            c.SecretEdgeExists = true;
+            c.SecretEdgeActive = false;
         }
     }
 
@@ -108,15 +125,17 @@ namespace Alibi.Core
         public static readonly string[] HoursL1 = { "20:00", "21:00", "22:00" };
         public static readonly string[] HoursL2 = { "20:00", "21:00", "22:00", "23:00" };
         public static readonly string[] HoursL3 = { "20:00", "21:00", "22:00", "23:00", "00:00" };
+        public static readonly string[] HoursL4 = { "20:00", "21:00", "22:00", "23:00", "00:00" };
         public static readonly string[] RoomsL1 = { "HO", "SA", "KU", "DN", "BI" };
         public static readonly string[] RoomsL2 = { "HO", "SA", "BI", "KU", "DN", "SH", "KO" };
+        public static readonly string[] RoomsL4 = { "HO", "SA", "BI", "KU", "DN", "SH", "KO", "ZY", "BO" };
 
         public static readonly LevelSpec[] Levels =
         {
             new LevelSpec { Level = 1, Name = "Mësimi", SuspectIds = new[] { "A", "B", "D", "E" }, RoomIds = RoomsL1, Hours = HoursL1, Budget = 12, UseGraph = false, Types = new[] { CaseType.Vrasja }, Unlocks = "Vetëm Vrasja. Mësohet tabela dhe menyja e pyetjeve.", Playable = true },
             new LevelSpec { Level = 2, Name = "Lëvizja", SuspectIds = new[] { "A", "B", "D", "E", "F" }, RoomIds = RoomsL2, Hours = HoursL2, Budget = 12, UseGraph = true, Types = new[] { CaseType.Vrasja }, Unlocks = "Grafi i lëvizjes: askush nuk zhvendoset pa kaluar nëpër dhomat ndërmjetëse.", Playable = true },
             new LevelSpec { Level = 3, Name = "Sabotimi", SuspectIds = new[] { "A", "B", "D", "E", "F" }, RoomIds = RoomsL2, Hours = HoursL3, Budget = 11, UseGraph = true, Types = new[] { CaseType.Sabotimi }, Unlocks = "Dëshmitari me gabim (Karta 3) dhe Sabotimi: ora e krimit nuk dihet.", Playable = true },
-            new LevelSpec { Level = 4, Name = "Kalimi", Unlocks = "Vjedhja dhe kalimi i fshehtë Biblioteka–Zyra.", Playable = false, Budget = 10 },
+            new LevelSpec { Level = 4, Name = "Kalimi", SuspectIds = new[] { "A", "B", "D", "E", "F", "G" }, RoomIds = RoomsL4, Hours = HoursL4, Budget = 10, UseGraph = true, Types = new[] { CaseType.Vjedhja }, Unlocks = "Vjedhja dhe kalimi i fshehtë Biblioteka–Zyra (R06).", Playable = true },
             new LevelSpec { Level = 5, Name = "Fajtori", Unlocks = "Të tria llojet së bashku dhe refuzimet (R10).", Playable = false, Budget = 9 },
             new LevelSpec { Level = 6, Name = "I pafund", Unlocks = "Lloj dhe hartë të rastësishme.", Playable = false }
         };
@@ -152,6 +171,7 @@ namespace Alibi.Core
             {
                 case 2: return Card2();
                 case 3: return Card3();
+                case 4: return Card4();
                 default: return Card1();
             }
         }
@@ -283,6 +303,55 @@ namespace Alibi.Core
             BaseRules(c);
             c.Rules.Add("Lëvizja vetëm mes dhomave të lidhura, një kalim për orë (R02). Lidhjet: " + Villa.EdgeList(c) + ".");
             c.Rules.Add("Një dëshmitar i ndershëm gabon pa dashje në një përgjigje të vetme (R05): një kundërshtim i vetëm nuk mjafton, duhen dy të pavarura.");
+            c.Prepare();
+            return c;
+        }
+
+        public static CaseDefinition Card4()
+        {
+            var c = new CaseDefinition
+            {
+                Id = "karta4",
+                CardNumber = 4,
+                Level = 4,
+                Seed = 404,
+                Title = "Karta 4 — Kalimi i fshehtë",
+                Kicker = "FAZA 4 · NIVELI 4",
+                Objective = "Zbulo kalimin e fshehtë Biblioteka–Zyra dhe provo kush vodhi dosjen nga Zyra në 22:00.",
+                Premise = "Një dosje e mbyllur u zhduk nga Zyra e katit të parë në 22:00. Në Bibliotekë, rafti i vjetër duket i lëvizur.",
+                Hours = HoursL4,
+                Budget = 10,
+                Par = 7,
+                Type = CaseType.Vjedhja
+            };
+            Villa.ApplyRooms(c, RoomsL4, true);
+            Villa.ApplySuspects(c, new[] { "A", "B", "D", "E", "F", "G" });
+            Villa.SetSecretEdge(c, "BI", "ZY");
+            c.CrimeRoom = c.RoomIndex("ZY");
+            c.CrimeTime = 2;
+            c.Culprit = c.SuspectIndex("F");
+            // World paths: F uses secret BI→ZY. At 22:00 the five honest suspects share Salloni.
+            c.Truth = new[]
+            {
+                Villa.Path(c, "KU", "HO", "SA", "SA", "HO"), // A
+                Villa.Path(c, "DN", "SA", "SA", "SA", "DN"), // B
+                Villa.Path(c, "DN", "DN", "SA", "HO", "KU"), // D
+                Villa.Path(c, "SA", "BI", "SA", "HO", "SH"), // E — with F in BI at 21:00
+                Villa.Path(c, "SA", "BI", "ZY", "KO", "SH"), // F — secret BI→ZY into the office
+                Villa.Path(c, "KU", "HO", "SA", "SA", "HO")  // G
+            };
+            c.Cover = Villa.Path(c, "SA", "SA", "SA", "SA", "SA");
+            c.PhysicalClues.Add(new PhysicalClue
+            {
+                Room = c.RoomIndex("BI"),
+                Title = "Rafti i rrëshqitshëm",
+                Text = "Pas librit të rëndë hapet një kalim i ngushtë drejt Zyrës. Lidhja Biblioteka–Zyra ekziston.",
+                RevealsSecret = true
+            });
+            BaseRules(c);
+            c.Rules.Add("Lëvizja vetëm mes dhomave të lidhura, një kalim për orë (R02). Lidhjet e njohura: " + Villa.EdgeList(c) + ".");
+            c.Rules.Add("Prova fizike mund të zbulojë kalimin e fshehtë Biblioteka–Zyra; pastaj domain rillogaritet (R06). Kërko dhomën me butonin «Kërko» (kosto 1).");
+            c.Rules.Add("Lloji: Vjedhja — dhoma dhe ora e krimit dihen; duhet të provosh personin.");
             c.Prepare();
             return c;
         }
