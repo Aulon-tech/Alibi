@@ -17,6 +17,7 @@ namespace Alibi.EditorTools
         const string MenuPath = "Assets/Alibi/Scenes/Alibi_MainMenu.unity";
         const string GamePath = "Assets/Alibi/Scenes/Alibi_Game.unity";
         const string MaterialPath = "Assets/Alibi/Resources/AlibiLit.mat";
+        const string EntryScriptPath = "Assets/Alibi/Unity/AlibiSceneEntry.cs";
         const string PromptKey = "Alibi.SetupPrompted";
 
         static AlibiSetup()
@@ -65,8 +66,8 @@ namespace Alibi.EditorTools
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return false;
             EnsureMaterial();
             if (!AssetDatabase.IsValidFolder(ScenesDir)) AssetDatabase.CreateFolder(Root, "Scenes");
-            if (!File.Exists(GamePath)) CreateScene(GamePath, true);
-            if (!File.Exists(MenuPath)) CreateScene(MenuPath, false);
+            if (!SceneIsHealthy(GamePath)) CreateScene(GamePath, true);
+            if (!SceneIsHealthy(MenuPath)) CreateScene(MenuPath, false);
             var scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
             scenes.RemoveAll(s => s.path == MenuPath || s.path == GamePath);
             scenes.Insert(0, new EditorBuildSettingsScene(MenuPath, true));
@@ -75,6 +76,14 @@ namespace Alibi.EditorTools
             AssetDatabase.SaveAssets();
             if (openMenu) EditorSceneManager.OpenScene(MenuPath, OpenSceneMode.Single);
             return true;
+        }
+
+        static bool SceneIsHealthy(string path)
+        {
+            if (!File.Exists(path)) return false;
+            string guid = AssetDatabase.AssetPathToGUID(EntryScriptPath);
+            if (string.IsNullOrEmpty(guid)) return true;
+            return File.ReadAllText(path).Contains(guid);
         }
 
         static void CreateScene(string path, bool game)
