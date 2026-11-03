@@ -196,7 +196,42 @@ namespace Alibi.Unity
 
             view.Bounds = bounds;
             view.BuildMarkers();
+            view.SecretPassage = BuildSecretPassage(root.transform, present);
+            if (view.SecretPassage != null) view.SecretPassage.SetActive(c.SecretEdgeActive);
             return view;
+        }
+
+        // Golden stair / shaft between Biblioteka (ground) and Zyra (upper) along the shared wall at x=0.
+        static GameObject BuildSecretPassage(Transform root, HashSet<string> present)
+        {
+            if (!present.Contains("BI") || !present.Contains("ZY")) return null;
+            var bi = Layout("BI");
+            var zy = Layout("ZY");
+            var go = new GameObject("SecretPassage_BI_ZY");
+            go.transform.SetParent(root, false);
+            var gold = Theme.Lit(Theme.Hex("#E2C27A"), 0.65f);
+            var glow = Theme.Ghost(Theme.WithAlpha(Theme.Gold, 0.45f));
+            float zMid = (Mathf.Max(bi.Z0, zy.Z0) + Mathf.Min(bi.Z1, zy.Z1)) * 0.5f;
+            float x = 0f;
+            const int steps = 7;
+            for (int s = 0; s < steps; s++)
+            {
+                float t = (s + 0.5f) / steps;
+                float y = Mathf.Lerp(bi.Y + 0.08f, zy.Y + 0.08f, t);
+                float xOff = Mathf.Lerp(0.35f, -0.35f, t);
+                Box(go.transform, "GoldStep" + s, new Vector3(x + xOff, y, zMid), new Vector3(0.55f, 0.07f, 0.9f), gold);
+            }
+            FlatQuad(go.transform, "GoldGlow", new Vector3(x, (bi.Y + zy.Y) * 0.5f + 0.2f, zMid), new Vector2(0.35f, 1.1f), glow);
+            var lightGo = new GameObject("SecretLight");
+            lightGo.transform.SetParent(go.transform, false);
+            lightGo.transform.localPosition = new Vector3(x, (bi.Y + zy.Y) * 0.5f + 0.5f, zMid);
+            var light = lightGo.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = Theme.Gold;
+            light.range = 3.2f;
+            light.intensity = 1.4f;
+            light.shadows = LightShadows.None;
+            return go;
         }
 
         static void BuildEdge(Transform root, CaseDefinition c, HashSet<string> present, HashSet<string> done, RoomLayout room, bool vertical, float at, float from, float to, Material wallMat, Material capMat, Material doorMat)
@@ -263,11 +298,17 @@ namespace Alibi.Unity
         public Bounds Bounds;
         public GameObject CrimeDecal;
         public Light CrimeLight;
+        public GameObject SecretPassage;
         public Action<int> RoomClicked;
         public Action<int> SuspectClicked;
         public Action BackgroundClicked;
         public CameraRig Rig;
         float crimeTarget;
+
+        public void SetSecretPassageVisible(bool on)
+        {
+            if (SecretPassage != null) SecretPassage.SetActive(on);
+        }
 
         public void BuildMarkers()
         {

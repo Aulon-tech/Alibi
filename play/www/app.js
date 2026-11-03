@@ -11,13 +11,22 @@ const state = {
   hintsOn: true
 };
 
-const Q = [
+const Q_BASE = [
   { type: 1, label: "Ku ishe në orën X?", cost: 1, needs: ["time"] },
   { type: 2, label: "A ke qenë ndonjëherë në dhomën R?", cost: 1, needs: ["room"] },
   { type: 3, label: "A e ke parë personin Y në orën X?", cost: 1, needs: ["other", "time"] },
   { type: 4, label: "Kush ishte me ty në orën X?", cost: 2, needs: ["time"] },
   { type: 5, label: "Në cilën dhomë ishe para se të kaloje në R?", cost: 2, needs: ["room"] }
 ];
+
+function questionsFor(session) {
+  const list = Q_BASE.slice();
+  if (session?.hasItem) {
+    const item = session.itemAcc || "dosjen";
+    list.push({ type: 6, label: `A e ke parë ${item} në orën X?`, cost: 1, needs: ["time"] });
+  }
+  return list;
+}
 
 async function api(path, opts) {
   const res = await fetch(path, {
@@ -92,7 +101,8 @@ function advanceHintIfMatched(fill) {
 function draftReady() {
   const d = state.draft;
   if (d.suspect < 0 || !d.type) return { ok: false, msg: "Zgjidh të dyshuarin dhe pyetjen." };
-  const meta = Q.find(q => q.type === d.type);
+  const meta = questionsFor(state.session).find(q => q.type === d.type);
+  if (!meta) return { ok: false, msg: "Pyetje e pavlefshme." };
   if (meta.needs.includes("time") && d.time < 0) return { ok: false, msg: "Zgjidh orën." };
   if (meta.needs.includes("room") && d.room < 0) return { ok: false, msg: "Zgjidh dhomën." };
   if (meta.needs.includes("other") && d.other < 0) return { ok: false, msg: "Zgjidh personin Y." };
@@ -105,7 +115,7 @@ function composeText() {
   const d = state.draft;
   if (d.suspect < 0) return "Zgjidh një të dyshuar…";
   const name = s.suspects[d.suspect].name;
-  const meta = Q.find(q => q.type === d.type);
+  const meta = questionsFor(s).find(q => q.type === d.type);
   if (!meta) return `Pyet ${name}…`;
   let t = meta.label
     .replace("orën X", d.time >= 0 ? s.hours[d.time] : "orën X")
@@ -163,6 +173,22 @@ function domainCell(s, t) {
   return row.count + "?";
 }
 
+function renderSecretPassage(s) {
+  const a = s.rooms[s.secretA];
+  const b = s.rooms[s.secretB];
+  if (!a || !b) return "";
+  return `
+    <div class="secret-passage" aria-label="Kalimi i fshehtë">
+      <div class="secret-passage-label">Kalim i zbuluar · R06</div>
+      <div class="secret-passage-track">
+        <span class="secret-end-name">${esc(a.name)}</span>
+        <span class="secret-stairs" title="shkallë e artë">▣▣▣</span>
+        <span class="secret-end-name">${esc(b.name)}</span>
+      </div>
+      <div class="secret-passage-note">Lidhja e artë ${esc(a.name)}–${esc(b.name)} është tani aktive në vilë / graf.</div>
+    </div>`;
+}
+
 function renderHints(s) {
   const tut = s.tutorial || [];
   if (!tut.length) return "";
@@ -188,6 +214,7 @@ function renderGame() {
   const s = state.session;
   const over = s.phase === "Won" || s.phase === "Lost" || s.phase === "Abandoned";
   const ready = draftReady();
+  const Q = questionsFor(s);
   const qMeta = Q.find(q => q.type === state.draft.type);
 
   app.innerHTML = `
@@ -210,7 +237,8 @@ function renderGame() {
           <h2>${esc(s.title)}</h2>
           <p style="color:var(--muted);margin-top:0">${esc(s.premise)}</p>
           <p>${esc(s.objective)}</p>
-          ${s.secretExists ? `<p style="color:var(--gold-soft)">Kalimi i fshehtë: ${s.secretActive ? "i zbuluar (R06)" : "ende i fshehtë — Q6 «Kërko» në dhomën e duhur"}</p>` : ""}
+          ${s.secretExists ? `<p style="color:var(--gold-soft)">Kalimi i fshehtë: ${s.secretActive ? "i zbuluar (R06) — shih vijën e artë Biblioteka–Zyra" : "ende i fshehtë — «Kërko» në Bibliotekë"}</p>` : ""}
+          ${s.secretActive ? renderSecretPassage(s) : ""}
 
           ${renderHints(s)}
 
@@ -242,15 +270,21 @@ function renderGame() {
             <button class="btn primary" id="btn-ask" ${ready.ok ? "" : "disabled"}>Pyet</button>
           </div>
 
-          <div class="section">Dhoma · Q6 Kërko (R06)</div>
+          <div class="section">Dhoma · Kërko (R06)</div>
           <div class="rooms">
             ${s.rooms.map(r => {
               const clue = (s.clues || []).find(c => c.room === r.id);
               const crime = r.id === s.crimeRoom;
-              return `<div class="room ${crime ? "crime" : ""}">
-                <h4>${esc(r.name)}${crime ? " · krimi" : ""}</h4>
-                <div class="links">Lidhet: ${r.links.map(i => s.rooms[i].name).join(", ") || "—"}</div>
-                ${clue ? `<button class="btn ghost" style="margin-top:8px;width:100%" data-search="${r.id}" ${clue.found || s.remaining <= 0 ? "disabled" : ""}>${clue.found ? "E kërkuar" : "Q6 Kërko · −1"}</button>` : ""}
+              const onSecret = s.secretActive && (r.id === s.secretA || r.id === s.secretB);
+              return `<div class="room ${crime ? "crime" : ""} ${onSecret ? "secret-end" : ""}">
+                <h4>${esc(r.name)}${crime ? " · krimi" : ""}${onSecret ? " · kalim" : ""}</h4>
+                <div class="links">Lidhet: ${(r.links || []).map(l => {
+                  const id = typeof l === "object" ? l.id : l;
+                  const secret = typeof l === "object" && l.secret;
+                  const name = s.rooms[id]?.name || "?";
+                  return secret ? `<span class="secret-link">${esc(name)}</span>` : esc(name);
+                }).join(", ") || "—"}</div>
+                ${clue ? `<button class="btn ghost" style="margin-top:8px;width:100%" data-search="${r.id}" ${clue.found || s.remaining <= 0 ? "disabled" : ""}>${clue.found ? "E kërkuar" : "Kërko · −1"}</button>` : ""}
               </div>`;
             }).join("")}
           </div>

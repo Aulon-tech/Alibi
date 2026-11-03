@@ -364,6 +364,7 @@ namespace Alibi.Unity
                 return;
             }
             LastOutcome = outcome;
+            if (caseDef.SecretEdgeActive && villa != null) villa.SetSecretPassageVisible(true);
             board.Refresh(currentTime, Truth);
             RefreshAll();
             Panels.Toast(canvas.transform, outcome.Message, caseDef.SecretEdgeActive ? Theme.Gold : Theme.Text, 4f);
