@@ -330,12 +330,18 @@ namespace Alibi.Unity
                     var lt = UI.LabelAt(root, "Lidhet me: " + (links.Count == 0 ? "—" : string.Join(", ", links.ToArray())), Theme.Sans, 12, Theme.Muted, 14, iy + 4, 272, 20);
                     iy += UI.FitHeight(lt, 272) + 6;
                 }
+                if (caseDef.HasItem && Session.Eval.ItemPossible != null)
+                {
+                    bool here = Session.Eval.ItemPossible[currentTime, selectedRoom];
+                    var it = UI.LabelAt(root, here ? "Dosja mund të jetë këtu në " + caseDef.Hours[currentTime] + "." : "Dosja nuk është këtu në " + caseDef.Hours[currentTime] + ".", Theme.Sans, 12, here ? Theme.Gold : Theme.Muted, 14, iy + 4, 272, 20);
+                    iy += UI.FitHeight(it, 272) + 6;
+                }
                 if (!Truth && caseDef.PhysicalClues.Count > 0 && Session.Remaining > 0)
                 {
                     bool already = false;
                     foreach (var pc in Session.FoundClues) if (pc.Room == selectedRoom) already = true;
                     foreach (var pc in caseDef.PhysicalClues) if (pc.Room == selectedRoom && pc.Found) already = true;
-                    var search = UI.Button(root, already ? "E kërkuar" : "Q6 Kërko · −1", already || Session.IsOver ? BtnStyle.Disabled : BtnStyle.Chip, () => SearchSelectedRoom(), 14, 8);
+                    var search = UI.Button(root, already ? "E kërkuar" : "Kërko dhomën · −1", already || Session.IsOver ? BtnStyle.Disabled : BtnStyle.Chip, () => SearchSelectedRoom(), 14, 8);
                     UI.Place(search.Rect, 14, iy + 4, 272, 40);
                     search.SetInteractable(!already && !Session.IsOver && Session.Remaining > 0);
                     iy += 50;

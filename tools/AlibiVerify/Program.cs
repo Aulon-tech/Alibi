@@ -18,18 +18,22 @@ class Program
         }
 
         var c4 = LevelCards.Card4();
+        Assert(c4.HasItem && !c4.CrimeTimeKnown, "Card4 is a real theft (item + unknown time)");
         for (int s = 0; s < c4.N; s++) Assert(c4.PathValid(c4.Truth[s]), "truth " + c4.Suspects[s].Id);
         Assert(c4.PathValid(c4.Cover), "cover");
         Assert(!c4.PathValidKnown(c4.Truth[c4.Culprit]), "known graph blocks culprit");
         int sol;
         Assert(CaseGenerator.IsUniqueAllowingSecret(c4, out sol), "unique with secret sol=" + sol);
         Assert(!c4.SecretEdgeActive && c4.PathRooms != null, "restored hidden secret after check");
+        var route = new System.Collections.Generic.List<Question>();
+        int computedPar = ParPolicy.Compute(LevelCards.Card4(), new CspSolver(LevelCards.Card4()), 40, route);
+        Assert(computedPar <= c4.Par, "ParPolicy with search + Q6 = " + computedPar + " <= par " + c4.Par);
 
         var g = new GameSession(LevelCards.Card4());
         var c = g.Case;
         Assert(g.SearchRoom(c.RoomIndex("BI")).Accepted && c.SecretEdgeActive, "R06 search");
-        string[] route = { "A,1,2", "F,4,2", "B,3,2,F", "A,3,2,F", "D,1,2", "D,3,2,G", "E,1,1", "E,3,1,F", "G,6,1", "A,3,2,B", "E,1,4", "E,6,4" };
-        foreach (var step in route)
+        string[] steps = { "A,1,2", "F,4,2", "B,3,2,F", "A,3,2,F", "D,1,2", "D,3,2,G", "E,1,1", "E,3,1,F", "G,6,1", "A,3,2,B", "E,1,4", "E,6,4" };
+        foreach (var step in steps)
         {
             var p = step.Split(',');
             var q = Question.Make(c.SuspectIndex(p[0]), (QType)int.Parse(p[1]), int.Parse(p[2]), -1, p.Length > 3 ? c.SuspectIndex(p[3]) : -1);

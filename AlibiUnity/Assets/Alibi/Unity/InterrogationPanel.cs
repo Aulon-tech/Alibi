@@ -59,7 +59,7 @@ namespace Alibi.Unity
 
             UI.SectionLabel(root, "2 · PYETJA", pad, iy, iw);
             iy += 24;
-            foreach (var type in QuestionEngine.All)
+            foreach (var type in QuestionEngine.TypesFor(c))
             {
                 var qt = type;
                 bool on = q.HasType && q.Type == type;
