@@ -2,13 +2,14 @@
 
 > Vetëm për drejtuesin e playtest-it. Mos ia trego lojtarit.
 
-Konfigurimi: 6 të dyshuar, 9 dhoma, 5 orë, **buxhet 12**, **par 6**.
-Krimi: **Zyra**, ora **22:00**. Lloji: **Vjedhja**. Fajtori: **Fatmiri**, me gënjeshtër cover në Sallon.
-Kalimi i fshehtë: **Biblioteka–Zyra** (fillimisht i fshehtë; zbulohet me **Q6 «Kërko»** në Bibliotekë, kosto 1 / R06).
+Konfigurimi: 6 të dyshuar, 9 dhoma, 5 orë, **buxhet 16**, **par 14** (seed 404).
+Krimi: **Zyra**, ora **22:00** (ora nuk dihet lojtarit). Lloji: **Vjedhja**. Fajtori: **Fatmiri**, me cover në Sallon.
+Kalimi i fshehtë: **Biblioteka–Zyra** (zbulohet me **«Kërko»** në Bibliotekë, kosto 1 / R06 — jo me Q6).
+Q6: «A e ke parë dosjen në orën X?» (sendi lëviz me hajnin, R10).
 
 ### Balancimi
 
-Me rregullat e reja (Q6/Kërko hyn në kosto, R06 rillogarit grafin), par-i i vjetër i llogaritur «me dorë» dilte ~12 ndërsa buxheti ishte 10. **Buxheti u ngrit në 12**; rruga optimale e verifikuar me ParPolicy + Q6 kushton **6**. Rrugët e të dyshuarve mbeten të njëjtat (zgjidhja mbetet unike kur kalimi është i hapur).
+Pas Vjedhjes së plotë (send + orë e panjohur + Q6 dosja), ParPolicy me kërkim jep **par 14**; buxheti u ngrit në **16**. Rruga e verifikuar në `tools/AlibiVerify` mbyll rastin me **spent = 14** (3 yje).
 
 Verifikuar me program: zgjidhja është e vetme kur kalimi është i hapur.
 
@@ -18,10 +19,10 @@ Verifikuar me program: zgjidhja është e vetme kur kalimi është i hapur.
 |---|---|---|---|---|---|
 | Arta | Kuzhina | Holli | Salloni | Salloni | Holli |
 | Blerimi | Dhoma e ngrënies | Salloni | Salloni | Salloni | Dhoma e ngrënies |
-| Drita | Dhoma e ngrënies | Dhoma e ngrënies | Salloni | Holli | Kuzhina |
+| Drita | Holli | Shkallët | Korridori | Korridori | Shkallët |
 | Elmazi | Salloni | Biblioteka | Salloni | Holli | Shkallët |
 | Fatmiri | Salloni | Biblioteka | **Zyra** | Korridori | Shkallët |
-| Genta | Kuzhina | Holli | Salloni | Salloni | Holli |
+| Genta | Zyra | Zyra | Korridori | Shkallët | Holli |
 
 ## Cover i Fatmirit
 
@@ -30,29 +31,25 @@ Pretendon Sallonin në çdo orë.
 ## Kontradikta që e hap rastin
 
 Elmazi ishte në Bibliotekë në 21:00 dhe thotë se Fatmiri ishte me të.
-Fatmiri pretendon Sallonin — kontradiktë.
+Fatmiri pretendon Sallonin — kontradiktë. Kalimi i fshehtë e bën të mundur që Fatmiri të arrijë në Zyrë në 22:00.
 
-## Rruga e shkurtër (par = 6 / 3 yje)
+## Rruga e verifikuar (par = 14 / 3 yje)
 
-1. **Q6** Kërko Bibliotekën (−1) → zbulohet kalimi Biblioteka–Zyra (R06)
-2. Q1 te Elmazi për 21:00 → Biblioteka
-3. Q1 te Arta për 22:00 → Salloni
-4. Q4 te Fatmiri për 22:00 → i liston të gjithë të tjerët në Sallon (cover)
-5. Q1 te Drita për 21:00 → Dhoma e ngrënies → mbetet vetëm Fatmiri
-6. Akuza: Fatmiri, Zyra, 22:00
+Nga `AlibiVerify` (pas «Kërko» në Bibliotekë):
 
-Kosto: 1+1+1+2+1 = **6**.
+1. **Kërko** Bibliotekën (−1) → zbulohet kalimi Biblioteka–Zyra (R06); shfaqet shkalla e artë
+2. Q1 te Arta për 22:00 → Salloni
+3. Q4 te Fatmiri për 22:00 → liston Artën, Blerimin, Elmazin (cover)
+4. Q3 te Blerimi për Fatmirin në 22:00 → Jo
+5. Q3 te Arta për Fatmirin në 22:00 → Jo
+6. Q1 te Drita për 22:00 → Korridori
+7. Q3 te Drita për Gentën në 22:00 → Po
+8. Q1 te Elmazi për 21:00 → Biblioteka
+9. Q3 te Elmazi për Fatmirin në 21:00 → Po
+10. Q6 te Genta për 21:00 → Po, e pa dosjen (ende në Zyrë para vjedhjes)
+11. Q3 te Arta për Blerimin në 22:00 → Po
+12. Q1 te Elmazi për 00:00 → Shkallët
+13. Q6 te Elmazi për 00:00 → Po, e pa dosjen (me hajnin)
+14. Akuza: **Fatmiri, Zyra, 22:00**
 
-## Rruga pedagogjike (≈ 8, ende 3 yje me par 6)
-
-E dobishme për playtest / udhëzues: e ekspozon gënjeshtrën para akuzës.
-
-1. Q6 Kërko Bibliotekën (−1)
-2. Q1 te Elmazi për 21:00 → Biblioteka
-3. Q4 te Elmazi për 21:00 → Fatmiri
-4. Q1 te Fatmiri për 21:00 → Salloni (gënjeshtër, kontradiktë)
-5. Q1 te Arta për 22:00 → Salloni
-6. Q4 te Arta për 22:00 → Blerimi, Drita, Elmazi, Genta
-7. Akuza: Fatmiri, Zyra, 22:00
-
-Kosto: 1+1+2+1+1+2 = **8** (≤ par+1 → 3 yje; me Q2 shtesë për Zyrën bëhet 9 → 2 yje).
+Kosto totale: **14** (përfshin kërkimin).
