@@ -3,13 +3,13 @@ using System.Collections.Generic;
 
 namespace Alibi.Core
 {
-    public enum QType { Q1 = 1, Q2 = 2, Q3 = 3, Q4 = 4, Q5 = 5 }
+    public enum QType { Q1 = 1, Q2 = 2, Q3 = 3, Q4 = 4, Q5 = 5, Q6 = 6 }
 
     public enum CaseType { Vrasja, Sabotimi, Vjedhja }
 
     public enum Phase { CaseLoaded, Questioning, Accusing, Won, Lost, Abandoned }
 
-    public enum ConsKind { In, Ever, Prev, Same, Diff }
+    public enum ConsKind { In, Ever, Prev, Same, Diff, NotIn, ItemSeen }
 
     public sealed class RoomInfo
     {
@@ -86,6 +86,16 @@ namespace Alibi.Core
         public static Constraint Rel(bool same, int a, int b, int t)
         {
             return new Constraint { Kind = same ? ConsKind.Same : ConsKind.Diff, A = a, B = b, T = t };
+        }
+
+        public static Constraint NotIn(int s, int t, int r)
+        {
+            return new Constraint { Kind = ConsKind.NotIn, S = s, T = t, R = r };
+        }
+
+        public static Constraint ItemSeen(int s, int t, bool seen)
+        {
+            return new Constraint { Kind = ConsKind.ItemSeen, S = s, T = t, V = seen };
         }
     }
 
@@ -208,10 +218,19 @@ namespace Alibi.Core
         public int[] PathEver;
         public int[] PathPrev;
 
+        public string ItemName = "dosja";
+        public string ItemAcc = "dosjen";
+
         public int T { get { return Hours.Length; } }
         public int N { get { return Suspects.Length; } }
         public int RoomCount { get { return Rooms.Length; } }
-        public bool CrimeTimeKnown { get { return Type != CaseType.Sabotimi; } }
+        public bool CrimeTimeKnown { get { return Type == CaseType.Vrasja; } }
+        public bool HasItem { get { return Type == CaseType.Vjedhja; } }
+
+        public int ItemRoomAt(int t)
+        {
+            return t < CrimeTime ? CrimeRoom : Truth[Culprit][t];
+        }
 
         public int[] CrimeTimes
         {

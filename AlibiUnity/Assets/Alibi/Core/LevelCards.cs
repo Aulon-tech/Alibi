@@ -135,7 +135,7 @@ namespace Alibi.Core
             new LevelSpec { Level = 1, Name = "Mësimi", SuspectIds = new[] { "A", "B", "D", "E" }, RoomIds = RoomsL1, Hours = HoursL1, Budget = 12, UseGraph = false, Types = new[] { CaseType.Vrasja }, Unlocks = "Vetëm Vrasja. Mësohet tabela dhe menyja e pyetjeve.", Playable = true },
             new LevelSpec { Level = 2, Name = "Lëvizja", SuspectIds = new[] { "A", "B", "D", "E", "F" }, RoomIds = RoomsL2, Hours = HoursL2, Budget = 12, UseGraph = true, Types = new[] { CaseType.Vrasja }, Unlocks = "Grafi i lëvizjes: askush nuk zhvendoset pa kaluar nëpër dhomat ndërmjetëse.", Playable = true },
             new LevelSpec { Level = 3, Name = "Sabotimi", SuspectIds = new[] { "A", "B", "D", "E", "F" }, RoomIds = RoomsL2, Hours = HoursL3, Budget = 11, UseGraph = true, Types = new[] { CaseType.Sabotimi }, Unlocks = "Dëshmitari me gabim (Karta 3) dhe Sabotimi: ora e krimit nuk dihet.", Playable = true },
-            new LevelSpec { Level = 4, Name = "Kalimi", SuspectIds = new[] { "A", "B", "D", "E", "F", "G" }, RoomIds = RoomsL4, Hours = HoursL4, Budget = 12, UseGraph = true, Types = new[] { CaseType.Vjedhja }, Unlocks = "Vjedhja, Q6 «Kërko» dhe kalimi i fshehtë Biblioteka–Zyra (R06).", Playable = true },
+            new LevelSpec { Level = 4, Name = "Kalimi", SuspectIds = new[] { "A", "B", "D", "E", "F", "G" }, RoomIds = RoomsL4, Hours = HoursL4, Budget = 12, UseGraph = true, Types = new[] { CaseType.Vjedhja }, Unlocks = "Vjedhja: dosja lëviz me hajnin (R10), pyetja Q6 për sendin, «Kërko dhomën» dhe kalimi i fshehtë Biblioteka–Zyra (R06).", Playable = true },
             new LevelSpec { Level = 5, Name = "Fajtori", Unlocks = "Të tria llojet së bashku dhe refuzimet (R10).", Playable = false, Budget = 9 },
             new LevelSpec { Level = 6, Name = "I pafund", Unlocks = "Lloj dhe hartë të rastësishme.", Playable = false }
         };
@@ -317,12 +317,14 @@ namespace Alibi.Core
                 Seed = 404,
                 Title = "Karta 4 — Kalimi i fshehtë",
                 Kicker = "FAZA 4 · NIVELI 4",
-                Objective = "Zbulo kalimin e fshehtë Biblioteka–Zyra dhe provo kush vodhi dosjen nga Zyra në 22:00.",
-                Premise = "Një dosje e mbyllur u zhduk nga Zyra e katit të parë në 22:00. Në Bibliotekë, rafti i vjetër duket i lëvizur.",
+                Objective = "Provo kush e mori dosjen nga Zyra dhe në cilën orë. Dosja lëviz vetëm bashkë me atë që e mori.",
+                Premise = "Dosja e kontratave u zhduk nga Zyra e katit të parë gjatë mbrëmjes. Ora nuk dihet. Në Bibliotekë, rafti i vjetër duket i lëvizur.",
                 Hours = HoursL4,
-                Budget = 12,
-                Par = 6,
-                Type = CaseType.Vjedhja
+                Budget = 16,
+                Par = 14,
+                Type = CaseType.Vjedhja,
+                ItemName = "dosja",
+                ItemAcc = "dosjen"
             };
             Villa.ApplyRooms(c, RoomsL4, true);
             Villa.ApplySuspects(c, new[] { "A", "B", "D", "E", "F", "G" });
@@ -330,15 +332,14 @@ namespace Alibi.Core
             c.CrimeRoom = c.RoomIndex("ZY");
             c.CrimeTime = 2;
             c.Culprit = c.SuspectIndex("F");
-            // World paths: F uses secret BI→ZY. At 22:00 the five honest suspects share Salloni.
             c.Truth = new[]
             {
-                Villa.Path(c, "KU", "HO", "SA", "SA", "HO"), // A
-                Villa.Path(c, "DN", "SA", "SA", "SA", "DN"), // B
-                Villa.Path(c, "DN", "DN", "SA", "HO", "KU"), // D
-                Villa.Path(c, "SA", "BI", "SA", "HO", "SH"), // E — with F in BI at 21:00
-                Villa.Path(c, "SA", "BI", "ZY", "KO", "SH"), // F — secret BI→ZY into the office
-                Villa.Path(c, "KU", "HO", "SA", "SA", "HO")  // G
+                Villa.Path(c, "KU", "HO", "SA", "SA", "HO"),
+                Villa.Path(c, "DN", "SA", "SA", "SA", "DN"),
+                Villa.Path(c, "HO", "SH", "KO", "KO", "SH"),
+                Villa.Path(c, "SA", "BI", "SA", "HO", "SH"),
+                Villa.Path(c, "SA", "BI", "ZY", "KO", "SH"),
+                Villa.Path(c, "ZY", "ZY", "KO", "SH", "HO")
             };
             c.Cover = Villa.Path(c, "SA", "SA", "SA", "SA", "SA");
             c.PhysicalClues.Add(new PhysicalClue
@@ -350,19 +351,10 @@ namespace Alibi.Core
             });
             BaseRules(c);
             c.Rules.Add("Lëvizja vetëm mes dhomave të lidhura, një kalim për orë (R02). Lidhjet e njohura: " + Villa.EdgeList(c) + ".");
-            c.Rules.Add("Q6 «Kërko» (kosto 1) gjen prova fizike; mund të zbulojë kalimin Biblioteka–Zyra dhe domain rillogaritet (R06).");
-            c.Rules.Add("Lloji: Vjedhja — dhoma dhe ora e krimit dihen; duhet të provosh personin. Buxheti 12, par 6 (Q6 llogaritet në par).");
-            int A = c.SuspectIndex("A");
-            int E = c.SuspectIndex("E");
-            int F = c.SuspectIndex("F");
-            c.Tutorial.Add(new TutorialStep { Title = "Kalimi i fshehtë", Text = "Dosja u zhduk nga Zyra në 22:00. Rafti në Bibliotekë duket i lëvizur — provo Q6 «Kërko» atje (kosto 1). Pa kalimin, askush nuk arrin te Zyra nga Biblioteka në një orë." });
-            c.Tutorial.Add(new TutorialStep { Title = "Hapi 1 · Q6", Text = "Zgjidh Bibliotekën dhe shtyp «Q6 Kërko · −1». Zbulohet kalimi Biblioteka–Zyra (R06); grafi rillogaritet." });
-            c.Tutorial.Add(new TutorialStep { Title = "Hapi 2 · Q1", Text = "Pyet Elmazin: «Ku ishe në 21:00?»", Fill = Question.Make(E, QType.Q1, 1) });
-            c.Tutorial.Add(new TutorialStep { Title = "Hapi 3 · Q4", Text = "Pyet Elmazin: «Kush ishte me ty në 21:00?» — permend Fatmirin.", Fill = Question.Make(E, QType.Q4, 1) });
-            c.Tutorial.Add(new TutorialStep { Title = "Hapi 4 · kontradikta", Text = "Pyet Fatmirin: «Ku ishe në 21:00?» — pretendon Sallonin. Dy deklarata bien ndesh: Fatmiri gënjen.", Fill = Question.Make(F, QType.Q1, 1) });
-            c.Tutorial.Add(new TutorialStep { Title = "Hapi 5 · ora e krimit", Text = "Pyet Artën: «Ku ishe në 22:00?» — Salloni.", Fill = Question.Make(A, QType.Q1, 2) });
-            c.Tutorial.Add(new TutorialStep { Title = "Hapi 6 · shoqëruesit", Text = "Pyet Artën: «Kush ishte me ty në 22:00?» — Blerimi, Drita, Elmazi, Genta ishin në Sallon, jo në Zyrë.", Fill = Question.Make(A, QType.Q4, 2) });
-            c.Tutorial.Add(new TutorialStep { Title = "Akuza", Text = "Mbetet Fatmiri: ai ishte me Elmazin në Bibliotekë në 21:00 dhe e vetmja rrugë e re drejt Zyrës është kalimi i fshehtë. Akuzo: Fatmiri, Zyra, 22:00.", Accuse = true });
+            c.Rules.Add("Lloji: Vjedhja — dihet sendi (dosja) dhe dhoma e tij (Zyra); duhet të provosh kush e mori dhe në cilën orë (R09).");
+            c.Rules.Add("Sendi lëviz vetëm bashkë me një person (R10): para vjedhjes dosja është në Zyrë, pas saj është gjithmonë me hajnin.");
+            c.Rules.Add("Pyetja Q6 «A e ke parë dosjen në orën X?» kushton 1 dhe tregon nëse dikush ishte në të njëjtën dhomë me dosjen.");
+            c.Rules.Add("Prova fizike mund të zbulojë kalimin e fshehtë Biblioteka–Zyra; pastaj lëvizjet rillogariten (R06). Kërko dhomën me butonin «Kërko» (kosto 1).");
             c.Prepare();
             return c;
         }

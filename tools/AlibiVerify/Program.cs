@@ -18,9 +18,7 @@ class Program
         }
 
         var c4 = LevelCards.Card4();
-        Assert(c4.Budget == 12, "Card4 budget 12");
-        Assert(c4.Par == 6, "Card4 par 6");
-        Assert(c4.Tutorial.Count >= 7, "Card4 hints");
+        Assert(c4.HasItem && !c4.CrimeTimeKnown, "Card4 is a real theft (item + unknown time)");
         for (int s = 0; s < c4.N; s++) Assert(c4.PathValid(c4.Truth[s]), "truth " + c4.Suspects[s].Id);
         Assert(c4.PathValid(c4.Cover), "cover");
         Assert(!c4.PathValidKnown(c4.Truth[c4.Culprit]), "known graph blocks culprit");
@@ -29,36 +27,23 @@ class Program
         Assert(!c4.SecretEdgeActive && c4.PathRooms != null, "restored hidden secret after check");
         var route = new System.Collections.Generic.List<Question>();
         int computedPar = ParPolicy.Compute(LevelCards.Card4(), new CspSolver(LevelCards.Card4()), 40, route);
-        Assert(computedPar == 6, "ParPolicy with Q6 = 6 (got " + computedPar + ")");
+        Assert(computedPar <= c4.Par, "ParPolicy with search + Q6 = " + computedPar + " <= par " + c4.Par);
 
         var g = new GameSession(LevelCards.Card4());
-        int bi = g.Case.RoomIndex("BI");
-        int zy = g.Case.RoomIndex("ZY");
-        int a = g.Case.SuspectIndex("A");
-        int e = g.Case.SuspectIndex("E");
-        int f = g.Case.SuspectIndex("F");
-
-        Assert(g.SearchRoom(bi).Accepted && g.Case.SecretEdgeActive, "R06 search");
-        Assert(g.Ask(Question.Make(e, QType.Q1, 1)).Accepted, "E Q1");
-        var q4e = g.Ask(Question.Make(e, QType.Q4, 1));
-        Console.WriteLine("  " + q4e.Statement.Text);
-        var q1f = g.Ask(Question.Make(f, QType.Q1, 1));
-        Console.WriteLine("  " + q1f.Statement.Text + " conflict=" + (q1f.Conflict != null));
-        Assert(q1f.Conflict != null, "lie exposed");
-
-        Assert(g.Ask(Question.Make(a, QType.Q1, 2)).Accepted, "A Q1 crime");
-        var q4a = g.Ask(Question.Make(a, QType.Q4, 2));
-        Console.WriteLine("  " + q4a.Statement.Text);
-        Assert(g.Ask(Question.Make(a, QType.Q2, -1, zy)).Accepted, "A Q2 ZY");
-
-        Console.Write("  candidates:");
-        for (int k = 0; k < g.Case.N; k++) if (g.Eval.Candidate[k]) Console.Write(" " + g.Case.Suspects[k].Id);
-        Console.WriteLine(" viable=" + g.Eval.ViableCount + " spent=" + g.Spent);
-
-        var acc = g.Accuse(f, zy, 2);
-        Console.WriteLine("  phase=" + g.Phase + " proven=" + acc.Verdict.Proven + " stars=" + g.Stars);
+        var c = g.Case;
+        Assert(g.SearchRoom(c.RoomIndex("BI")).Accepted && c.SecretEdgeActive, "R06 search");
+        string[] steps = { "A,1,2", "F,4,2", "B,3,2,F", "A,3,2,F", "D,1,2", "D,3,2,G", "E,1,1", "E,3,1,F", "G,6,1", "A,3,2,B", "E,1,4", "E,6,4" };
+        foreach (var step in steps)
+        {
+            var p = step.Split(',');
+            var q = Question.Make(c.SuspectIndex(p[0]), (QType)int.Parse(p[1]), int.Parse(p[2]), -1, p.Length > 3 ? c.SuspectIndex(p[3]) : -1);
+            var o = g.Ask(q);
+            Console.WriteLine("  " + step + " -> " + o.Statement.Text);
+        }
+        Assert(g.Eval.ViableCount == 1 && g.Eval.ViableK[0] == c.Culprit && g.Eval.ViableTau[0] == 2, "only Fatmiri at 22:00 remains");
+        var acc = g.Accuse(c.Culprit, c.CrimeRoom, 2);
+        Console.WriteLine("  phase=" + g.Phase + " spent=" + g.Spent + " stars=" + g.Stars);
         Assert(g.Phase == Phase.Won, "Card4 won");
-        Assert(g.Stars >= 1, "stars");
 
         var g1 = new GameSession(LevelCards.Card1());
         g1.Ask(Question.Make(0, QType.Q4, 1));

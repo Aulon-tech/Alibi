@@ -90,10 +90,10 @@ namespace Alibi.Core
             Domains.Update(Eval);
         }
 
-        void RebuildSolver(EvalResult before)
+        void RebuildSolver()
         {
             Solver = new CspSolver(Case);
-            Eval = Solver.Evaluate(Statements, before);
+            Eval = Solver.Evaluate(Statements);
             Domains.Update(Eval);
         }
 
@@ -249,7 +249,7 @@ namespace Alibi.Core
             bool rebuilt = false;
             if (clue.RevealsSecret && Case.ActivateSecretEdge())
             {
-                RebuildSolver(before);
+                RebuildSolver();
                 rebuilt = true;
             }
             else
@@ -374,7 +374,11 @@ namespace Alibi.Core
                 parts.Add("#" + id + " " + Case.Suspects[st.Suspect].Def);
             }
             string text = "Këto deklarata nuk mund të jenë të gjitha të vërteta: " + string.Join(", ", parts.ToArray());
-            if (cf.InvolvesCrimeFact)
+            if (cf.InvolvesCrimeFact && Case.HasItem)
+            {
+                text += ", bashkë me faktin e vjedhjes (dikush e mori " + Case.ItemAcc + " nga " + Case.Rooms[Case.CrimeRoom].Loc + " dhe " + Case.ItemName + " lëviz vetëm me të)";
+            }
+            else if (cf.InvolvesCrimeFact)
             {
                 string when = Case.CrimeTimeKnown ? " në " + Case.Hours[Case.CrimeTime] : "";
                 text += ", bashkë me faktin e dosjes (dikush ishte në " + Case.Rooms[Case.CrimeRoom].Loc + when + ")";
