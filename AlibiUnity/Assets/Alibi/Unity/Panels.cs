@@ -11,12 +11,12 @@ namespace Alibi.Unity
     {
         public static readonly string[] HowToRules =
         {
-            "Zgjidh të dyshuarin, pyetjen dhe parametrin. Pyetjet Q1–Q3 kushtojnë 1, Q4–Q5 kushtojnë 2 nga buxheti (R11).",
+            "Zgjidh të dyshuarin, pyetjen dhe parametrin. Q1–Q3 dhe Q6 «Kërko» kushtojnë 1; Q4–Q5 kushtojnë 2 (R11).",
             "Çdo përgjigje bëhet kufizim dhe tabela përditësohet vetë me AC-3: ari = e konfirmuar, kuti = e mundshme, zbehur = e përjashtuar (R12).",
             "Të ndershmit thonë gjithmonë të vërtetën. Fajtori gënjen, dhe gënjeshtra del kur dy deklarata përplasen: sistemi i thekson si «Kontradiktë» (D9).",
             "Deklarata e dikujt për vetveten nuk e përjashton atë. Përjashtimi vjen nga deklaratat e të tjerëve dhe nga grafi i lëvizjes (R02, R08).",
             "Akuza kërkon personin, dhomën dhe orën. Fiton vetëm kur zgjidhësi konfirmon që asnjë kombinim tjetër nuk qëndron (R09).",
-            "Në fund shfaqet par-i i rastit: 3 yje deri në par+1, 2 yje deri në par+3, përndryshe 1 yll (R13)."
+            "Nga niveli 4, Q6 «Kërko» gjen prova fizike (p.sh. kalimin Biblioteka–Zyra, R06). Par-i: 3 yje ≤ par+1, 2 yje ≤ par+3, përndryshe 1 (R13)."
         };
 
         public static RectTransform Overlay(Transform canvas, string name)

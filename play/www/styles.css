@@ -276,6 +276,34 @@ button, select, input {
 .stmt .a { margin-top: 4px; }
 .stmt .f { font-family: var(--mono); font-size: 0.75rem; color: #8a97ab; margin-top: 4px; }
 
+.hint-box {
+  margin: 14px 0 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(201,162,39,0.35);
+  border-radius: 12px;
+  background: rgba(201,162,39,0.08);
+}
+.hint-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.hint-bar .role { color: var(--muted); font-size: 0.8rem; margin-right: auto; }
+.hint-title {
+  font-family: var(--serif);
+  color: var(--gold-soft);
+  font-size: 1.05rem;
+  margin-bottom: 4px;
+}
+.hint-text {
+  margin: 0;
+  color: var(--parchment);
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
 .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
 .room {
   border: 1px solid var(--line);

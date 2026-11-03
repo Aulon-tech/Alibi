@@ -13,8 +13,8 @@ Extension — Level 4 **Kalimi** (Vjedhja + secret passage Biblioteka–Zyra)
 |---|---|
 | Card | **Karta 4** (seed 404) |
 | Type | **Vjedhja** |
-| Setup | 6 suspects, 9 rooms, 5 hours, budget 10, par 7 |
-| Unlock | Secret passage **Biblioteka–Zyra** via physical search (R06) |
+| Setup | 6 suspects, 9 rooms, 5 hours, budget 12, par 6 |
+| Unlock | Secret passage **Biblioteka–Zyra** via **Q6 «Kërko»** (R06) |
 | Culprit | Fatmiri |
 
 Play the documented route in `case4_answer_key.md`. Cards 1–3 are unchanged and still unique.
@@ -48,7 +48,9 @@ dotnet run -c Release
 | `rules_table.md` | Rules R01–R13 |
 | `state_model.md` | State variables (levels 1–6) |
 | `case1_answer_key.md` | Level 1 key |
-| `case4_answer_key.md` | Level 4 key |
+| `case4_answer_key.md` | Level 4 key (budget 12, par 6) |
+| `case4_hints.md` | Level 4 tutorial / hints |
+| `rules_table.md` | Rules R01–R13, costs Q1–Q6 |
 | `test_cases.md` | TC-01…TC-10 |
 
 ## Levels

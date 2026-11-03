@@ -17,7 +17,7 @@ Nese e shtyp Play ne `SampleScene` pa i krijuar skenat, demo hapet prape aty.
 
 ## Cka permban demo
 
-Menyja ka Vazhdo, Kartat e niveleve, Rast i ri, Si luhet dhe Dil. Kartat 1–4 jane te verifikuara (te dyshuarit, dhomat, oret, buxheti, krimi, par-i) dhe hapen njera pas tjetres; per demo ka butonin "hap te gjitha kartat". Karta 1 ka udhezuesin hap pas hapi. Karta 4 (Kalimi) shton Vjedhjen, Zyre/Bodrum, Gentën dhe kalimin e fshehtë Biblioteka–Zyra (R06, butoni «Kërko dhomën»). Rast i ri gjeneron raste me seed per nivelin 1, nivelin 2 dhe Sabotimin; Karta 4 hapet si rast fiks (seed 404).
+Menyja ka Vazhdo, Kartat e niveleve, Rast i ri, Si luhet dhe Dil. Kartat 1–4 jane te verifikuara (te dyshuarit, dhomat, oret, buxheti, krimi, par-i) dhe hapen njera pas tjetres; per demo ka butonin "hap te gjitha kartat". Karta 1 dhe Karta 4 kane udhezuesin hap pas hapi. Karta 4 (Kalimi) shton Vjedhjen, Zyre/Bodrum, Gentën, Q6 «Kërko» dhe kalimin e fshehtë Biblioteka–Zyra (R06); buxhet 12, par 6. Rast i ri gjeneron raste me seed per nivelin 1, nivelin 2 dhe Sabotimin; Karta 4 hapet si rast fiks (seed 404).
 
 Ne loje: vila 3D me figurat (e plote = e konfirmuar, e tejdukshme = e mundshme, zhduket = e perjashtuar), slider-i i kohes, pyetjet Q1–Q5 me kosto, buxheti, tabela e deduksionit qe perditesohet vete (AC-3), dosja e deshmive, kontradikta e theksuar (D9), input i strukturuar (D10), akuza me person + dhome + ore, fitorja me yje dhe zinxhirin e kufizimeve, humbja me kufizimin qe e perjashtonte akuzen dhe pozicionet e verteta ne vile, "Provo perseri" me te njejtin seed (T11) dhe dalja pa akuze si ABANDONED (T10).
 
