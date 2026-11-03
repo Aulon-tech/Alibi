@@ -46,42 +46,63 @@ namespace Alibi.Core
 
         public static int Compute(CaseDefinition c, CspSolver solver, int limit, List<Question> route)
         {
-            var stmts = new List<Statement>();
-            var asked = new HashSet<string>();
-            var candidates = Candidates(c);
+            // Q6 «Kërko» (R06): hidden secret edges cost 1 to reveal and must be active
+            // for ParPolicy, otherwise the known graph cannot host the culprit's path.
+            bool hideAgain = false;
             int cost = 0;
-            var ev = solver.Evaluate(stmts);
-            while (ev.ViableCount > 1 && cost < limit)
+            if (c.SecretEdgeExists && !c.SecretEdgeActive)
             {
-                int baseMass = ev.Mass;
-                double bestGain = 0;
-                Question best = null;
-                Statement bestSt = null;
-                EvalResult bestEv = null;
-                foreach (var q in candidates)
-                {
-                    if (asked.Contains(q.Key)) continue;
-                    var st = MakeStatement(c, q, stmts.Count + 1);
-                    stmts.Add(st);
-                    var e2 = solver.Evaluate(stmts, ev);
-                    stmts.RemoveAt(stmts.Count - 1);
-                    double gain = (double)(baseMass - e2.Mass) / st.Cost;
-                    if (gain > bestGain + 1e-9)
-                    {
-                        bestGain = gain;
-                        best = q;
-                        bestSt = st;
-                        bestEv = e2;
-                    }
-                }
-                if (best == null) return Unsolvable;
-                asked.Add(best.Key);
-                stmts.Add(bestSt);
-                cost += bestSt.Cost;
-                ev = bestEv;
-                if (route != null) route.Add(best);
+                cost = 1;
+                c.ActivateSecretEdge();
+                solver = new CspSolver(c);
+                hideAgain = true;
             }
-            return ev.ViableCount == 1 ? cost : Unsolvable;
+            try
+            {
+                var stmts = new List<Statement>();
+                var asked = new HashSet<string>();
+                var candidates = Candidates(c);
+                var ev = solver.Evaluate(stmts);
+                while (ev.ViableCount > 1 && cost < limit)
+                {
+                    int baseMass = ev.Mass;
+                    double bestGain = 0;
+                    Question best = null;
+                    Statement bestSt = null;
+                    EvalResult bestEv = null;
+                    foreach (var q in candidates)
+                    {
+                        if (asked.Contains(q.Key)) continue;
+                        var st = MakeStatement(c, q, stmts.Count + 1);
+                        stmts.Add(st);
+                        var e2 = solver.Evaluate(stmts, ev);
+                        stmts.RemoveAt(stmts.Count - 1);
+                        double gain = (double)(baseMass - e2.Mass) / st.Cost;
+                        if (gain > bestGain + 1e-9)
+                        {
+                            bestGain = gain;
+                            best = q;
+                            bestSt = st;
+                            bestEv = e2;
+                        }
+                    }
+                    if (best == null) return Unsolvable;
+                    asked.Add(best.Key);
+                    stmts.Add(bestSt);
+                    cost += bestSt.Cost;
+                    ev = bestEv;
+                    if (route != null) route.Add(best);
+                }
+                return ev.ViableCount == 1 ? cost : Unsolvable;
+            }
+            finally
+            {
+                if (hideAgain)
+                {
+                    c.SecretEdgeActive = false;
+                    c.Prepare();
+                }
+            }
         }
     }
 

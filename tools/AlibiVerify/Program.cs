@@ -18,12 +18,18 @@ class Program
         }
 
         var c4 = LevelCards.Card4();
+        Assert(c4.Budget == 12, "Card4 budget 12");
+        Assert(c4.Par == 6, "Card4 par 6");
+        Assert(c4.Tutorial.Count >= 7, "Card4 hints");
         for (int s = 0; s < c4.N; s++) Assert(c4.PathValid(c4.Truth[s]), "truth " + c4.Suspects[s].Id);
         Assert(c4.PathValid(c4.Cover), "cover");
         Assert(!c4.PathValidKnown(c4.Truth[c4.Culprit]), "known graph blocks culprit");
         int sol;
         Assert(CaseGenerator.IsUniqueAllowingSecret(c4, out sol), "unique with secret sol=" + sol);
         Assert(!c4.SecretEdgeActive && c4.PathRooms != null, "restored hidden secret after check");
+        var route = new System.Collections.Generic.List<Question>();
+        int computedPar = ParPolicy.Compute(LevelCards.Card4(), new CspSolver(LevelCards.Card4()), 40, route);
+        Assert(computedPar == 6, "ParPolicy with Q6 = 6 (got " + computedPar + ")");
 
         var g = new GameSession(LevelCards.Card4());
         int bi = g.Case.RoomIndex("BI");

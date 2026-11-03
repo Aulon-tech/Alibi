@@ -335,7 +335,7 @@ namespace Alibi.Unity
                     bool already = false;
                     foreach (var pc in Session.FoundClues) if (pc.Room == selectedRoom) already = true;
                     foreach (var pc in caseDef.PhysicalClues) if (pc.Room == selectedRoom && pc.Found) already = true;
-                    var search = UI.Button(root, already ? "E kërkuar" : "Kërko dhomën · −1", already || Session.IsOver ? BtnStyle.Disabled : BtnStyle.Chip, () => SearchSelectedRoom(), 14, 8);
+                    var search = UI.Button(root, already ? "E kërkuar" : "Q6 Kërko · −1", already || Session.IsOver ? BtnStyle.Disabled : BtnStyle.Chip, () => SearchSelectedRoom(), 14, 8);
                     UI.Place(search.Rect, 14, iy + 4, 272, 40);
                     search.SetInteractable(!already && !Session.IsOver && Session.Remaining > 0);
                     iy += 50;

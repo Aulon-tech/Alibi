@@ -20,7 +20,7 @@ Teknologjia: Unity (C#). Ky dokument përshkruan gjendjen e lojës në mënyrë 
 | `errorWitness` | i dyshuar ose null | null (N1–2), 1 i ndershëm (N3+) | |
 | `errorUsed` | bool | `false` | |
 | `refusers[s]` | bashkësi llojesh pyetjesh | bosh (N1–4), jo bosh (N5+) | |
-| `budgetTotal` | int | 12, 12, 11, 10, 9, min+2 | > 0 |
+| `budgetTotal` | int | 12, 12, 11, 12, 9, min+2 | > 0 |
 | `budgetRemaining` | int | = `budgetTotal` | 0 ≤ budgetRemaining ≤ budgetTotal |
 | `domain[s][t]` | bashkësi dhomash | të gjitha `rooms` | nëse bëhet bosh → kontradiktë |
 | `statements` | listë | bosh | (i dyshuari, lloji, parametrat, përgjigja/REFUZIM, kostoja) |

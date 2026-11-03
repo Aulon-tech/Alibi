@@ -330,7 +330,8 @@ namespace Alibi.Tests
             Assert.IsFalse(c.SecretEdgeActive);
             Assert.AreEqual(6, c.N);
             Assert.AreEqual(9, c.RoomCount);
-            Assert.AreEqual(10, c.Budget);
+            Assert.AreEqual(12, c.Budget);
+            Assert.AreEqual(6, c.Par);
             Assert.IsFalse(c.PathValidKnown(c.Truth[c.Culprit]));
 
             var g = new GameSession(c);
@@ -365,7 +366,7 @@ namespace Alibi.Tests
             Assert.IsTrue(found.Accepted);
             Assert.IsTrue(g.Case.SecretEdgeActive);
             Assert.IsTrue(g.Case.CanMove(bi, zy));
-            Assert.AreEqual(8, g.Remaining);
+            Assert.AreEqual(10, g.Remaining);
         }
     }
 }

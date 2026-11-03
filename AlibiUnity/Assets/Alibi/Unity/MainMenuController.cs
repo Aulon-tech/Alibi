@@ -28,7 +28,7 @@ namespace Alibi.Unity
             "4 të dyshuar, 5 dhoma, 3 orë, buxhet 12. Pa graf lëvizjeje.",
             "5 të dyshuar, 7 dhoma me graf, 4 orë, buxhet 12. Askush nuk teleportohet.",
             "4 të dyshuar, 7 dhoma, 3 orë, buxhet 12. Ora e krimit nuk dihet: provo personin dhe orën.",
-            "6 të dyshuar, 9 dhoma, 5 orë, buxhet 10. Kalimi i fshehtë Biblioteka–Zyra (R06)."
+            "6 të dyshuar, 9 dhoma, 5 orë, buxhet 12, par 6. Q6 «Kërko» + kalimi Biblioteka–Zyra (R06)."
         };
         static readonly string[] ModeNotes =
         {

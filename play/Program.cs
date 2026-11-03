@@ -167,6 +167,20 @@ static object Snapshot(string id, GameSession g, string flash = null, AskOutcome
         crimeTimeKnown = c.CrimeTimeKnown,
         hours = c.Hours,
         rules = c.Rules,
+        tutorial = c.Tutorial.ConvertAll(t => new
+        {
+            title = t.Title,
+            text = t.Text,
+            accuse = t.Accuse,
+            fill = t.Fill == null ? null : new
+            {
+                suspect = t.Fill.Suspect,
+                type = t.Fill.HasType ? (int)t.Fill.Type : 0,
+                time = t.Fill.Time,
+                room = t.Fill.Room,
+                other = t.Fill.Other
+            }
+        }),
         suspects,
         rooms,
         domain,

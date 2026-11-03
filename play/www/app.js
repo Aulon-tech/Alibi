@@ -6,7 +6,9 @@ const state = {
   session: null,
   draft: { suspect: -1, type: 0, time: -1, room: -1, other: -1 },
   viewTime: 0,
-  flash: null
+  flash: null,
+  hintIndex: 0,
+  hintsOn: true
 };
 
 const Q = [
@@ -62,9 +64,29 @@ function renderHome() {
 async function startCard(card) {
   state.flash = null;
   state.draft = { suspect: -1, type: 0, time: -1, room: -1, other: -1 };
+  state.hintIndex = 0;
+  state.hintsOn = true;
   state.session = await api("/api/session", { method: "POST", body: JSON.stringify({ card }) });
   state.viewTime = state.session.crimeTime;
   renderGame();
+}
+
+function currentHint() {
+  const tut = state.session?.tutorial || [];
+  if (!state.hintsOn || !tut.length || state.hintIndex >= tut.length) return null;
+  return tut[state.hintIndex];
+}
+
+function advanceHintIfMatched(fill) {
+  const h = currentHint();
+  if (!h?.fill || !fill) return;
+  const f = h.fill;
+  if (f.suspect === fill.suspect && f.type === fill.type &&
+      (f.time < 0 || f.time === fill.time) &&
+      (f.room < 0 || f.room === fill.room) &&
+      (f.other < 0 || f.other === fill.other)) {
+    state.hintIndex++;
+  }
 }
 
 function draftReady() {
@@ -101,6 +123,7 @@ async function ask() {
   state.session = await api(`/api/session/${state.session.sessionId}/ask`, { method: "POST", body: JSON.stringify(body) });
   state.flash = state.session.conflict || state.session.flash;
   if (d.time >= 0) state.viewTime = d.time;
+  advanceHintIfMatched(body);
   renderGame();
 }
 
@@ -110,6 +133,13 @@ async function searchRoom(room) {
     body: JSON.stringify({ room })
   });
   state.flash = state.session.flash;
+  const tut = state.session.tutorial || [];
+  while (state.hintIndex < tut.length) {
+    const h = tut[state.hintIndex];
+    if (h.fill) break;
+    state.hintIndex++;
+    if (/Q6|Kërko/i.test(h.title || "")) break;
+  }
   renderGame();
 }
 
@@ -131,6 +161,27 @@ function domainCell(s, t) {
   if (row.count === 1) return state.session.rooms[row.possible[0]].name;
   if (row.count === 0) return "∅";
   return row.count + "?";
+}
+
+function renderHints(s) {
+  const tut = s.tutorial || [];
+  if (!tut.length) return "";
+  const h = currentHint();
+  const n = Math.min(state.hintIndex + 1, tut.length);
+  return `
+    <div class="hint-box">
+      <div class="hint-bar">
+        <strong>Udhëzuesi</strong>
+        <span class="role">${state.hintsOn ? `hapi ${n} / ${tut.length}` : "fikur"}</span>
+        <button class="btn ghost" id="btn-hint-toggle" type="button">${state.hintsOn ? "Fshih" : "Shfaq"}</button>
+        ${state.hintsOn && h ? `<button class="btn ghost" id="btn-hint-next" type="button">Tjetri</button>` : ""}
+        ${state.hintsOn && h?.fill ? `<button class="btn ghost" id="btn-hint-fill" type="button">Plotëso pyetjen</button>` : ""}
+      </div>
+      ${state.hintsOn && h ? `
+        <div class="hint-title">${esc(h.title)}</div>
+        <p class="hint-text">${esc(h.text)}</p>
+      ` : state.hintsOn ? `<p class="hint-text">Udhëzuesi përfundoi — akuzo kur je gati.</p>` : ""}
+    </div>`;
 }
 
 function renderGame() {
@@ -159,7 +210,9 @@ function renderGame() {
           <h2>${esc(s.title)}</h2>
           <p style="color:var(--muted);margin-top:0">${esc(s.premise)}</p>
           <p>${esc(s.objective)}</p>
-          ${s.secretExists ? `<p style="color:var(--gold-soft)">Kalimi i fshehtë: ${s.secretActive ? "i zbuluar (R06)" : "ende i fshehtë — kërko dhomat"}</p>` : ""}
+          ${s.secretExists ? `<p style="color:var(--gold-soft)">Kalimi i fshehtë: ${s.secretActive ? "i zbuluar (R06)" : "ende i fshehtë — Q6 «Kërko» në dhomën e duhur"}</p>` : ""}
+
+          ${renderHints(s)}
 
           <div class="section">1 · I dyshuari</div>
           <div class="chips">
@@ -189,7 +242,7 @@ function renderGame() {
             <button class="btn primary" id="btn-ask" ${ready.ok ? "" : "disabled"}>Pyet</button>
           </div>
 
-          <div class="section">Dhoma · kërko (R06)</div>
+          <div class="section">Dhoma · Q6 Kërko (R06)</div>
           <div class="rooms">
             ${s.rooms.map(r => {
               const clue = (s.clues || []).find(c => c.room === r.id);
@@ -197,7 +250,7 @@ function renderGame() {
               return `<div class="room ${crime ? "crime" : ""}">
                 <h4>${esc(r.name)}${crime ? " · krimi" : ""}</h4>
                 <div class="links">Lidhet: ${r.links.map(i => s.rooms[i].name).join(", ") || "—"}</div>
-                ${clue ? `<button class="btn ghost" style="margin-top:8px;width:100%" data-search="${r.id}" ${clue.found || s.remaining <= 0 ? "disabled" : ""}>${clue.found ? "E kërkuar" : "Kërko · −1"}</button>` : ""}
+                ${clue ? `<button class="btn ghost" style="margin-top:8px;width:100%" data-search="${r.id}" ${clue.found || s.remaining <= 0 ? "disabled" : ""}>${clue.found ? "E kërkuar" : "Q6 Kërko · −1"}</button>` : ""}
               </div>`;
             }).join("")}
           </div>
@@ -251,6 +304,24 @@ function renderGame() {
     </div>`;
 
   $("#btn-home")?.addEventListener("click", () => { state.session = null; renderHome(); });
+  $("#btn-hint-toggle")?.addEventListener("click", () => { state.hintsOn = !state.hintsOn; renderGame(); });
+  $("#btn-hint-next")?.addEventListener("click", () => {
+    const tut = s.tutorial || [];
+    if (state.hintIndex < tut.length) state.hintIndex++;
+    renderGame();
+  });
+  $("#btn-hint-fill")?.addEventListener("click", () => {
+    const h = currentHint();
+    if (!h?.fill) return;
+    state.draft = {
+      suspect: h.fill.suspect,
+      type: h.fill.type,
+      time: h.fill.time,
+      room: h.fill.room,
+      other: h.fill.other
+    };
+    renderGame();
+  });
   if (over) {
     $("#btn-again")?.addEventListener("click", () => startCard(s.card));
     $("#btn-next")?.addEventListener("click", () => startCard(Math.min(4, s.card + 1)));
