@@ -321,35 +321,106 @@ namespace Alibi.Tests
             }
         }
 
+        static void Route4(GameSession g)
+        {
+            var c = g.Case;
+            Assert.IsTrue(g.SearchRoom(c.RoomIndex("BI")).Accepted);
+            Ask(g, "A", QType.Q1, 2);
+            Ask(g, "F", QType.Q4, 2);
+            g.Ask(Question.Make(c.SuspectIndex("B"), QType.Q3, 2, -1, c.SuspectIndex("F")));
+            g.Ask(Question.Make(c.SuspectIndex("A"), QType.Q3, 2, -1, c.SuspectIndex("F")));
+            Ask(g, "D", QType.Q1, 2);
+            g.Ask(Question.Make(c.SuspectIndex("D"), QType.Q3, 2, -1, c.SuspectIndex("G")));
+            Ask(g, "E", QType.Q1, 1);
+            g.Ask(Question.Make(c.SuspectIndex("E"), QType.Q3, 1, -1, c.SuspectIndex("F")));
+            Ask(g, "G", QType.Q6, 1);
+            g.Ask(Question.Make(c.SuspectIndex("A"), QType.Q3, 2, -1, c.SuspectIndex("B")));
+            Ask(g, "E", QType.Q1, 4);
+            Ask(g, "E", QType.Q6, 4);
+        }
+
         [Test]
-        public void Karta4_KalimiIFshehteDheZgjidhja()
+        public void Karta4_VjedhjaMeKalimDheZgjidhja()
         {
             var c = LevelCards.Card4();
             Assert.AreEqual(CaseType.Vjedhja, c.Type);
+            Assert.IsFalse(c.CrimeTimeKnown);
+            Assert.IsTrue(c.HasItem);
             Assert.IsTrue(c.SecretEdgeExists);
             Assert.IsFalse(c.SecretEdgeActive);
             Assert.AreEqual(6, c.N);
             Assert.AreEqual(9, c.RoomCount);
-            Assert.AreEqual(12, c.Budget);
-            Assert.AreEqual(6, c.Par);
             Assert.IsFalse(c.PathValidKnown(c.Truth[c.Culprit]));
-
             var g = new GameSession(c);
-            int bi = c.RoomIndex("BI");
-            int zy = c.RoomIndex("ZY");
-            Assert.IsTrue(g.SearchRoom(bi).Accepted);
-            Assert.IsTrue(g.Case.SecretEdgeActive);
-            Ask(g, "E", QType.Q1, 1);
-            Assert.AreEqual("Me mua ishte Fatmiri.", Ask(g, "E", QType.Q4, 1).Statement.Text);
-            var lie = Ask(g, "F", QType.Q1, 1);
-            Assert.IsNotNull(lie.Conflict);
-            Ask(g, "A", QType.Q1, 2);
-            Ask(g, "A", QType.Q4, 2);
-            Ask(g, "A", QType.Q2, -1, "ZY");
-            Assert.AreEqual("F", Names(g));
-            var r = g.Accuse(g.Case.SuspectIndex("F"), zy, 2);
+            Route4(g);
+            Assert.AreEqual(1, g.Eval.ViableCount);
+            Assert.AreEqual(c.Culprit, g.Eval.ViableK[0]);
+            Assert.AreEqual(2, g.Eval.ViableTau[0]);
+            Assert.LessOrEqual(g.Spent, c.Par);
+            var r = g.Accuse(c.Culprit, c.CrimeRoom, 2);
             Assert.IsTrue(r.Accepted);
             Assert.AreEqual(Phase.Won, g.Phase);
+            Assert.AreEqual(3, g.Stars);
+        }
+
+        [Test]
+        public void Vjedhja_Q6_SendiLevizMeBartesin()
+        {
+            var c = LevelCards.Card4();
+            string table = "";
+            for (int s = 0; s < c.N; s++)
+            {
+                for (int t = 0; t < c.T; t++) table += QuestionEngine.Answer(c, Question.Make(s, QType.Q6, t)).Constraints[0].V ? "1" : "0";
+                table += " ";
+            }
+            Assert.AreEqual("00000 00000 00011 00001 00000 11000 ", table);
+            Assert.AreEqual(c.RoomIndex("ZY"), c.ItemRoomAt(1));
+            Assert.AreEqual(c.RoomIndex("KO"), c.ItemRoomAt(3));
+            var g = new GameSession(c);
+            var o = Ask(g, "D", QType.Q6, 3);
+            Assert.AreEqual("Po, në 23:00 e pashë dosjen.", o.Statement.Text);
+            Assert.AreEqual(1, o.Statement.Cost);
+            Assert.IsNotNull(g.Eval.ItemPossible);
+        }
+
+        [Test]
+        public void Vjedhja_Q6_VetemTeVjedhja()
+        {
+            var g = new GameSession(LevelCards.Card1());
+            var o = g.Ask(Question.Make(0, QType.Q6, 1));
+            Assert.IsFalse(o.Accepted);
+            Assert.AreEqual("Kjo pyetje vlen vetëm te vjedhja", o.Message);
+            Assert.AreEqual(5, QuestionEngine.TypesFor(LevelCards.Card1()).Length);
+            Assert.AreEqual(6, QuestionEngine.TypesFor(LevelCards.Card4()).Length);
+        }
+
+        [Test]
+        public void Vjedhja_PersoniISakteOraEGabuarHumb()
+        {
+            var g = new GameSession(LevelCards.Card4());
+            Route4(g);
+            var r = g.Accuse(g.Case.Culprit, g.Case.CrimeRoom, 3);
+            Assert.IsTrue(r.Accepted);
+            Assert.AreEqual(Phase.Lost, g.Phase);
+            Assert.IsFalse(r.Verdict.OkTime);
+            Assert.IsTrue(r.Verdict.OkPerson);
+        }
+
+        [Test]
+        public void Kalimi_ZbulimiPasPyetjeveRihapHipotezat()
+        {
+            var g = new GameSession(LevelCards.Card4());
+            var c = g.Case;
+            int f = c.SuspectIndex("F");
+            Ask(g, "E", QType.Q1, 1);
+            g.Ask(Question.Make(c.SuspectIndex("E"), QType.Q3, 1, -1, f));
+            Ask(g, "G", QType.Q6, 1);
+            Ask(g, "D", QType.Q1, 3);
+            Ask(g, "D", QType.Q6, 3);
+            Assert.IsFalse(g.Eval.IsViable(f, 2));
+            Assert.IsTrue(g.SearchRoom(c.RoomIndex("BI")).Accepted);
+            Assert.IsTrue(c.SecretEdgeActive);
+            Assert.IsTrue(g.Eval.IsViable(f, 2));
         }
 
         [Test]
@@ -366,7 +437,7 @@ namespace Alibi.Tests
             Assert.IsTrue(found.Accepted);
             Assert.IsTrue(g.Case.SecretEdgeActive);
             Assert.IsTrue(g.Case.CanMove(bi, zy));
-            Assert.AreEqual(10, g.Remaining);
+            Assert.AreEqual(g.Case.Budget - 2, g.Remaining);
         }
     }
 }

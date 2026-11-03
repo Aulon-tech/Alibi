@@ -11,6 +11,7 @@ namespace Alibi.Core
         public bool[] TimeCandidate;
         public bool[,,] Possible;
         public int[,] Count;
+        public bool[,] ItemPossible;
 
         public int ViableCount { get { return ViableK.Count; } }
 
@@ -92,17 +93,28 @@ namespace Alibi.Core
 
         public CaseDefinition Case { get { return c; } }
 
-        static void Collect(IList<Statement> stmts, int skipSuspect, int skipId, List<Constraint> unary, List<Constraint> bins)
+        bool Collect(IList<Statement> stmts, int skipSuspect, int skipId, int hypK, int hypTau, List<Constraint> unary, List<Constraint> bins)
         {
             foreach (var st in stmts)
             {
                 if (st.Suspect == skipSuspect || st.Id == skipId) continue;
                 foreach (var k in st.Constraints)
                 {
-                    if (k.IsBinary) bins.Add(k);
+                    if (k.Kind == ConsKind.ItemSeen)
+                    {
+                        if (hypK < 0) continue;
+                        if (k.T < hypTau) unary.Add(k.V ? Constraint.In(k.S, k.T, c.CrimeRoom) : Constraint.NotIn(k.S, k.T, c.CrimeRoom));
+                        else if (k.S == hypK)
+                        {
+                            if (!k.V) return false;
+                        }
+                        else bins.Add(Constraint.Rel(k.V, k.S, hypK, k.T));
+                    }
+                    else if (k.IsBinary) bins.Add(k);
                     else unary.Add(k);
                 }
             }
+            return true;
         }
 
         bool UnaryOk(int p, Constraint k)
@@ -110,6 +122,7 @@ namespace Alibi.Core
             switch (k.Kind)
             {
                 case ConsKind.In: return pr[p * tCount + k.T] == k.R;
+                case ConsKind.NotIn: return pr[p * tCount + k.T] != k.R;
                 case ConsKind.Ever: return ((c.PathEver[p] & (1 << k.R)) != 0) == k.V;
                 case ConsKind.Prev: return c.PathPrev[p * rCount + k.R] == k.Prev;
             }
@@ -179,19 +192,41 @@ namespace Alibi.Core
 
         bool HasSolution(int[][] d, List<Constraint> bins, bool needCrime)
         {
-            var rel = new bool[n, tCount];
-            if (needCrime)
+            if (!needCrime) return Search(d, bins);
+            foreach (var tau in crimeTimes)
             {
-                for (int s = 0; s < n; s++) foreach (var tau in crimeTimes) rel[s, tau] = true;
+                for (int s = 0; s < n; s++)
+                {
+                    var list = new List<int>();
+                    foreach (var p in d[s]) if (pr[p * tCount + tau] == c.CrimeRoom) list.Add(p);
+                    if (list.Count == 0) continue;
+                    var d2 = (int[][])d.Clone();
+                    d2[s] = list.ToArray();
+                    if (Search(d2, bins)) return true;
+                }
             }
+            return false;
+        }
+
+        bool Search(int[][] d, List<Constraint> bins)
+        {
+            if (bins.Count == 0) return true;
+            var rel = new bool[n, tCount];
+            var byS = new List<Constraint>[n];
+            for (int i = 0; i < n; i++) byS[i] = new List<Constraint>();
             foreach (var k in bins)
             {
                 rel[k.A, k.T] = true;
                 rel[k.B, k.T] = true;
+                byS[k.A].Add(k);
+                byS[k.B].Add(k);
             }
             var dom = new int[n][];
+            var involved = new List<int>();
             for (int s = 0; s < n; s++)
             {
+                if (byS[s].Count == 0) continue;
+                involved.Add(s);
                 var seen = new HashSet<int>();
                 var list = new List<int>();
                 foreach (var p in d[s])
@@ -205,35 +240,20 @@ namespace Alibi.Core
                 }
                 dom[s] = list.ToArray();
             }
-            var order = new int[n];
-            for (int i = 0; i < n; i++) order[i] = i;
-            Array.Sort(order, (a, b) => dom[a].Length.CompareTo(dom[b].Length));
+            var order = involved.ToArray();
+            Array.Sort(order, (x, y) =>
+            {
+                int byDeg = byS[y].Count.CompareTo(byS[x].Count);
+                return byDeg != 0 ? byDeg : dom[x].Length.CompareTo(dom[y].Length);
+            });
             var asg = new int[n];
             for (int i = 0; i < n; i++) asg[i] = -1;
-            var byS = new List<Constraint>[n];
-            for (int i = 0; i < n; i++) byS[i] = new List<Constraint>();
-            foreach (var k in bins)
-            {
-                byS[k.A].Add(k);
-                byS[k.B].Add(k);
-            }
-            return Backtrack(0, order, dom, asg, byS, needCrime);
+            return Backtrack(0, order, dom, asg, byS);
         }
 
-        bool Backtrack(int i, int[] order, int[][] dom, int[] asg, List<Constraint>[] byS, bool needCrime)
+        bool Backtrack(int i, int[] order, int[][] dom, int[] asg, List<Constraint>[] byS)
         {
-            if (i == order.Length)
-            {
-                if (!needCrime) return true;
-                for (int s = 0; s < n; s++)
-                {
-                    foreach (var tau in crimeTimes)
-                    {
-                        if (pr[asg[s] * tCount + tau] == c.CrimeRoom) return true;
-                    }
-                }
-                return false;
-            }
+            if (i == order.Length) return true;
             int sus = order[i];
             foreach (var p in dom[sus])
             {
@@ -251,7 +271,7 @@ namespace Alibi.Core
                 }
                 if (!ok) continue;
                 asg[sus] = p;
-                if (Backtrack(i + 1, order, dom, asg, byS, needCrime)) return true;
+                if (Backtrack(i + 1, order, dom, asg, byS)) return true;
                 asg[sus] = -1;
             }
             return false;
@@ -261,7 +281,7 @@ namespace Alibi.Core
         {
             var unary = new List<Constraint>();
             var bins = new List<Constraint>();
-            Collect(stmts, -1, -1, unary, bins);
+            Collect(stmts, -1, -1, -1, -1, unary, bins);
             var d = Propagate(unary, bins, -1, -1);
             return d != null && HasSolution(d, bins, true);
         }
@@ -270,7 +290,7 @@ namespace Alibi.Core
         {
             var unary = new List<Constraint>();
             var bins = new List<Constraint>();
-            Collect(stmts, -1, -1, unary, bins);
+            Collect(stmts, -1, -1, -1, -1, unary, bins);
             var d = Propagate(unary, bins, -1, -1);
             return d != null && HasSolution(d, bins, false);
         }
@@ -279,14 +299,14 @@ namespace Alibi.Core
         {
             var unary = new List<Constraint>();
             var bins = new List<Constraint>();
-            Collect(stmts, k, dropId, unary, bins);
+            if (!Collect(stmts, k, dropId, k, tau, unary, bins)) return null;
             var d = Propagate(unary, bins, k, tau);
             if (d == null) return null;
             if (!HasSolution(d, bins, false)) return null;
             return d;
         }
 
-        bool ViableFor(IList<Statement> stmts, int k, int tau, bool[,,] union)
+        bool ViableFor(IList<Statement> stmts, int k, int tau, bool[,,] union, bool[,] itemUnion)
         {
             bool any = false;
             var d = HypDomains(stmts, k, tau, -1);
@@ -295,6 +315,7 @@ namespace Alibi.Core
                 any = true;
                 if (union == null) return true;
                 Merge(d, union);
+                MergeItem(d, k, tau, itemUnion);
             }
             if (c.ErrorsAllowed > 0)
             {
@@ -306,6 +327,7 @@ namespace Alibi.Core
                     any = true;
                     if (union == null) return true;
                     Merge(d2, union);
+                    MergeItem(d2, k, tau, itemUnion);
                 }
             }
             return any;
@@ -322,6 +344,20 @@ namespace Alibi.Core
             }
         }
 
+        void MergeItem(int[][] d, int k, int tau, bool[,] itemUnion)
+        {
+            if (itemUnion == null) return;
+            for (int t = 0; t < tCount; t++)
+            {
+                if (t < tau)
+                {
+                    itemUnion[t, c.CrimeRoom] = true;
+                    continue;
+                }
+                foreach (var p in d[k]) itemUnion[t, pr[p * tCount + t]] = true;
+            }
+        }
+
         public EvalResult Evaluate(IList<Statement> stmts, EvalResult prior = null)
         {
             var ev = new EvalResult
@@ -329,14 +365,15 @@ namespace Alibi.Core
                 Candidate = new bool[n],
                 TimeCandidate = new bool[tCount],
                 Possible = new bool[n, tCount, rCount],
-                Count = new int[n, tCount]
+                Count = new int[n, tCount],
+                ItemPossible = c.HasItem ? new bool[tCount, rCount] : null
             };
             for (int k = 0; k < n; k++)
             {
                 foreach (var tau in crimeTimes)
                 {
                     if (prior != null && !prior.IsViable(k, tau)) continue;
-                    if (ViableFor(stmts, k, tau, ev.Possible))
+                    if (ViableFor(stmts, k, tau, ev.Possible, ev.ItemPossible))
                     {
                         ev.ViableK.Add(k);
                         ev.ViableTau.Add(tau);
@@ -359,8 +396,8 @@ namespace Alibi.Core
 
         public bool IsViable(IList<Statement> stmts, int k, int tau)
         {
-            if (tau >= 0) return ViableFor(stmts, k, tau, null);
-            foreach (var t in crimeTimes) if (ViableFor(stmts, k, t, null)) return true;
+            if (tau >= 0) return ViableFor(stmts, k, tau, null, null);
+            foreach (var t in crimeTimes) if (ViableFor(stmts, k, t, null, null)) return true;
             return false;
         }
 

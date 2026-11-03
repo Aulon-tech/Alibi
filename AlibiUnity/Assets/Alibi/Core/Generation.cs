@@ -16,6 +16,7 @@ namespace Alibi.Core
                 {
                     list.Add(Question.Make(s, QType.Q1, t));
                     list.Add(Question.Make(s, QType.Q4, t));
+                    if (c.HasItem) list.Add(Question.Make(s, QType.Q6, t));
                     for (int y = 0; y < c.N; y++) if (y != s) list.Add(Question.Make(s, QType.Q3, t, -1, y));
                 }
                 for (int r = 0; r < c.RoomCount; r++)
@@ -46,63 +47,42 @@ namespace Alibi.Core
 
         public static int Compute(CaseDefinition c, CspSolver solver, int limit, List<Question> route)
         {
-            // Q6 «Kërko» (R06): hidden secret edges cost 1 to reveal and must be active
-            // for ParPolicy, otherwise the known graph cannot host the culprit's path.
-            bool hideAgain = false;
+            var stmts = new List<Statement>();
+            var asked = new HashSet<string>();
+            var candidates = Candidates(c);
             int cost = 0;
-            if (c.SecretEdgeExists && !c.SecretEdgeActive)
+            var ev = solver.Evaluate(stmts);
+            while (ev.ViableCount > 1 && cost < limit)
             {
-                cost = 1;
-                c.ActivateSecretEdge();
-                solver = new CspSolver(c);
-                hideAgain = true;
-            }
-            try
-            {
-                var stmts = new List<Statement>();
-                var asked = new HashSet<string>();
-                var candidates = Candidates(c);
-                var ev = solver.Evaluate(stmts);
-                while (ev.ViableCount > 1 && cost < limit)
+                int baseMass = ev.Mass;
+                double bestGain = 0;
+                Question best = null;
+                Statement bestSt = null;
+                EvalResult bestEv = null;
+                foreach (var q in candidates)
                 {
-                    int baseMass = ev.Mass;
-                    double bestGain = 0;
-                    Question best = null;
-                    Statement bestSt = null;
-                    EvalResult bestEv = null;
-                    foreach (var q in candidates)
+                    if (asked.Contains(q.Key)) continue;
+                    var st = MakeStatement(c, q, stmts.Count + 1);
+                    stmts.Add(st);
+                    var e2 = solver.Evaluate(stmts, ev);
+                    stmts.RemoveAt(stmts.Count - 1);
+                    double gain = (double)(baseMass - e2.Mass) / st.Cost;
+                    if (gain > bestGain + 1e-9)
                     {
-                        if (asked.Contains(q.Key)) continue;
-                        var st = MakeStatement(c, q, stmts.Count + 1);
-                        stmts.Add(st);
-                        var e2 = solver.Evaluate(stmts, ev);
-                        stmts.RemoveAt(stmts.Count - 1);
-                        double gain = (double)(baseMass - e2.Mass) / st.Cost;
-                        if (gain > bestGain + 1e-9)
-                        {
-                            bestGain = gain;
-                            best = q;
-                            bestSt = st;
-                            bestEv = e2;
-                        }
+                        bestGain = gain;
+                        best = q;
+                        bestSt = st;
+                        bestEv = e2;
                     }
-                    if (best == null) return Unsolvable;
-                    asked.Add(best.Key);
-                    stmts.Add(bestSt);
-                    cost += bestSt.Cost;
-                    ev = bestEv;
-                    if (route != null) route.Add(best);
                 }
-                return ev.ViableCount == 1 ? cost : Unsolvable;
+                if (best == null) return Unsolvable;
+                asked.Add(best.Key);
+                stmts.Add(bestSt);
+                cost += bestSt.Cost;
+                ev = bestEv;
+                if (route != null) route.Add(best);
             }
-            finally
-            {
-                if (hideAgain)
-                {
-                    c.SecretEdgeActive = false;
-                    c.Prepare();
-                }
-            }
+            return ev.ViableCount == 1 ? cost : Unsolvable;
         }
     }
 
@@ -156,6 +136,7 @@ namespace Alibi.Core
                 {
                     list.Add(ParPolicy.MakeStatement(c, Question.Make(s, QType.Q1, t), list.Count + 1));
                     list.Add(ParPolicy.MakeStatement(c, Question.Make(s, QType.Q4, t), list.Count + 1));
+                    if (c.HasItem) list.Add(ParPolicy.MakeStatement(c, Question.Make(s, QType.Q6, t), list.Count + 1));
                 }
                 for (int r = 0; r < c.RoomCount; r++)
                 {
@@ -386,7 +367,7 @@ namespace Alibi.Core
                 return null;
             }
             var route = new List<Question>();
-            int maxPar = sabotage ? c.Budget - 1 : c.Budget - 3;
+            int maxPar = sabotage ? c.Budget - 1 : type == CaseType.Vjedhja ? c.Budget - 2 : c.Budget - 3;
             int par = ParPolicy.Compute(c, solver, maxPar, route);
             if (par == ParPolicy.Unsolvable || par > maxPar)
             {
@@ -409,8 +390,8 @@ namespace Alibi.Core
             else if (type == CaseType.Vjedhja)
             {
                 c.Title = "Vjedhja në " + room.Loc;
-                c.Objective = "Gjej kush e vodhi dhe akuzo me provë — person, dhomë dhe orë.";
-                c.Premise = "Një dosje u zhduk nga " + room.Loc + " në " + c.Hours[c.CrimeTime] + ". Kalimi i fshehtë mund të jetë i rëndësishëm.";
+                c.Objective = "Gjej kush e mori " + c.ItemAcc + " dhe kur: personi dhe ora duhen provuar.";
+                c.Premise = "Një dosje u zhduk nga " + room.Loc + " gjatë mbrëmjes. Ora nuk dihet; dosja lëviz vetëm bashkë me atë që e mori.";
             }
             else
             {
@@ -420,9 +401,13 @@ namespace Alibi.Core
             }
             c.Rules.Add("Çdo i dyshuar ndodhet në saktësisht një dhomë në çdo orë (R01).");
             c.Rules.Add("Të dyshuarit e ndershëm thonë gjithmonë të vërtetën (R03). Fajtori gënjen të paktën një herë (R04).");
-            c.Rules.Add(sabotage
-                ? "Fajtori ka qenë në " + room.Loc + " në orën e sabotimit, të cilën duhet ta provosh (R08, R09)."
-                : "Fajtori duhet të ketë qenë në " + room.Loc + " në " + c.Hours[c.CrimeTime] + " (R08).");
+            if (sabotage) c.Rules.Add("Fajtori ka qenë në " + room.Loc + " në orën e sabotimit, të cilën duhet ta provosh (R08, R09).");
+            else if (type == CaseType.Vjedhja)
+            {
+                c.Rules.Add("Hajni ka qenë në " + room.Loc + " në orën kur e mori " + c.ItemAcc + "; personi dhe ora duhen provuar (R08, R09).");
+                c.Rules.Add("Sendi lëviz vetëm bashkë me një person (R10): para vjedhjes është në " + room.Loc + ", pas saj është gjithmonë me hajnin.");
+            }
+            else c.Rules.Add("Fajtori duhet të ketë qenë në " + room.Loc + " në " + c.Hours[c.CrimeTime] + " (R08).");
             if (c.UseGraph) c.Rules.Add("Lëvizja vetëm mes dhomave të lidhura, një kalim për orë (R02). Lidhjet: " + Villa.EdgeList(c) + ".");
             else c.Rules.Add("Pa graf lëvizjeje në këtë nivel.");
             c.Rules.Add("Rasti u gjenerua me seed " + seed + " dhe u kontrollua që të ketë saktësisht një zgjidhje. Par-i i llogaritur nga ParPolicy: " + par + ".");

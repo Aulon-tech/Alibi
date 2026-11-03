@@ -14,6 +14,12 @@ namespace Alibi.Core
     public static class QuestionEngine
     {
         public static readonly QType[] All = { QType.Q1, QType.Q2, QType.Q3, QType.Q4, QType.Q5 };
+        public static readonly QType[] AllWithItem = { QType.Q1, QType.Q2, QType.Q3, QType.Q4, QType.Q5, QType.Q6 };
+
+        public static QType[] TypesFor(CaseDefinition c)
+        {
+            return c != null && c.HasItem ? AllWithItem : All;
+        }
 
         public static int Cost(QType t)
         {
@@ -22,7 +28,7 @@ namespace Alibi.Core
 
         public static bool NeedsTime(QType t)
         {
-            return t == QType.Q1 || t == QType.Q3 || t == QType.Q4;
+            return t == QType.Q1 || t == QType.Q3 || t == QType.Q4 || t == QType.Q6;
         }
 
         public static bool NeedsRoom(QType t)
@@ -48,6 +54,7 @@ namespace Alibi.Core
                 case QType.Q2: return "A ke qenë ndonjëherë në dhomën R?";
                 case QType.Q3: return "A e ke parë personin Y në orën X?";
                 case QType.Q4: return "Kush ishte me ty në orën X?";
+                case QType.Q6: return "A e ke parë sendin në orën X?";
                 default: return "Në cilën dhomë ishe para se të kaloje në R?";
             }
         }
@@ -60,6 +67,7 @@ namespace Alibi.Core
                 case QType.Q2: return "Kufizim mbi të gjitha intervalet njëherësh.";
                 case QType.Q3: return "Lidh dy persona në një interval.";
                 case QType.Q4: return "Lidh një person me të gjithë të tjerët në atë interval.";
+                case QType.Q6: return "Vetëm te vjedhja: kufizim mbi pozicionin e sendit.";
                 default: return "Lidh dy intervale dhe përdor grafin e lëvizjes.";
             }
         }
@@ -75,6 +83,7 @@ namespace Alibi.Core
                 case QType.Q2: return "A ke qenë ndonjëherë në " + (room ?? "dhomën R") + "?";
                 case QType.Q3: return "A e ke parë " + (q.Other >= 0 && q.Other < c.N ? c.Suspects[q.Other].Acc : "personin Y") + " në " + x + "?";
                 case QType.Q4: return "Kush ishte me ty në " + x + "?";
+                case QType.Q6: return "A e ke parë " + c.ItemAcc + " në " + x + "?";
                 default: return "Në cilën dhomë ishe para se të kaloje në " + (room ?? "R") + "?";
             }
         }
@@ -98,6 +107,7 @@ namespace Alibi.Core
         {
             if (q.Suspect >= c.N) return "I dyshuar i pavlefshëm";
             if (!q.HasType) return null;
+            if (q.Type == QType.Q6 && !c.HasItem) return "Kjo pyetje vlen vetëm te vjedhja";
             if (NeedsRoom(q.Type) && q.Room >= c.RoomCount) return "Dhomë e pavlefshme";
             if (NeedsTime(q.Type) && q.Time >= c.T) return "Orë e pavlefshme";
             if (NeedsOther(q.Type) && q.Other >= 0 && (q.Other == q.Suspect || q.Other >= c.N)) return "Person i pavlefshëm";
@@ -192,6 +202,19 @@ namespace Alibi.Core
                     string text = with.Count == 0 ? "Isha vetëm." : with.Count == 1 ? "Me mua ishte " + with[0] + "." : "Me mua ishin " + JoinNames(with) + ".";
                     return new Answer { Text = text, Constraints = cons.ToArray(), Formal = formal.ToString() };
                 }
+                case QType.Q6:
+                {
+                    bool seen = q.Suspect == c.Culprit
+                        ? q.Time < c.CrimeTime && p[q.Time] == c.CrimeRoom
+                        : p[q.Time] == c.ItemRoomAt(q.Time);
+                    string item = c.ItemName.Substring(0, 1).ToUpper() + c.ItemName.Substring(1);
+                    return new Answer
+                    {
+                        Text = seen ? "Po, në " + hour + " e pashë " + c.ItemAcc + "." : "Jo, në " + hour + " nuk e pashë " + c.ItemAcc + ".",
+                        Constraints = new[] { Constraint.ItemSeen(q.Suspect, q.Time, seen) },
+                        Formal = me.Name + "(" + hour + ") " + (seen ? "=" : "≠") + " " + item + "(" + hour + ")"
+                    };
+                }
                 default:
                 {
                     int v = PrevOf(p, q.Room);
@@ -230,6 +253,8 @@ namespace Alibi.Core
                 else
                 {
                     var p = c.Truth[k.S];
+                    if (k.Kind == ConsKind.ItemSeen && (p[k.T] == c.ItemRoomAt(k.T)) != k.V) return false;
+                    if (k.Kind == ConsKind.NotIn && p[k.T] == k.R) return false;
                     if (k.Kind == ConsKind.In && p[k.T] != k.R) return false;
                     if (k.Kind == ConsKind.Ever && Contains(p, k.R) != k.V) return false;
                     if (k.Kind == ConsKind.Prev && PrevOf(p, k.R) != k.Prev) return false;
