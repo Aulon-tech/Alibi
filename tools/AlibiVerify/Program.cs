@@ -26,8 +26,11 @@ class Program
         Assert(CaseGenerator.IsUniqueAllowingSecret(c4, out sol), "unique with secret sol=" + sol);
         Assert(!c4.SecretEdgeActive && c4.PathRooms != null, "restored hidden secret after check");
         var route = new System.Collections.Generic.List<Question>();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         int computedPar = ParPolicy.Compute(LevelCards.Card4(), new CspSolver(LevelCards.Card4()), 40, route);
+        sw.Stop();
         Assert(computedPar <= c4.Par, "ParPolicy with search + Q6 = " + computedPar + " <= par " + c4.Par);
+        Assert(sw.ElapsedMilliseconds < 4000, "ParPolicy Card4 under 4s (got " + sw.ElapsedMilliseconds + "ms)");
 
         var g = new GameSession(LevelCards.Card4());
         var c = g.Case;

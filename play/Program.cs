@@ -100,8 +100,12 @@ static object Snapshot(string id, GameSession g, string flash = null, AskOutcome
     var rooms = new List<object>();
     for (int i = 0; i < c.RoomCount; i++)
     {
-        var links = new List<int>();
-        for (int j = 0; j < c.RoomCount; j++) if (i != j && c.CanMove(i, j)) links.Add(j);
+        var links = new List<object>();
+        for (int j = 0; j < c.RoomCount; j++)
+        {
+            if (i == j || !c.CanMove(i, j)) continue;
+            links.Add(new { id = j, secret = c.SecretEdgeActive && c.IsSecretPair(i, j) });
+        }
         rooms.Add(new { id = i, code = c.Rooms[i].Id, name = c.Rooms[i].Name, links });
     }
     var domain = new List<object>();
@@ -156,6 +160,11 @@ static object Snapshot(string id, GameSession g, string flash = null, AskOutcome
         forced = g.ForcedAccusation,
         secretActive = c.SecretEdgeActive,
         secretExists = c.SecretEdgeExists,
+        secretA = c.SecretEdgeExists ? c.SecretA : -1,
+        secretB = c.SecretEdgeExists ? c.SecretB : -1,
+        hasItem = c.HasItem,
+        itemName = c.HasItem ? c.ItemName : null,
+        itemAcc = c.HasItem ? c.ItemAcc : null,
         card = c.CardNumber,
         title = c.Title,
         kicker = c.Kicker,

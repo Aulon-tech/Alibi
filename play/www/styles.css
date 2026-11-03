@@ -313,8 +313,54 @@ button, select, input {
   text-align: left;
 }
 .room.crime { border-color: rgba(185,74,60,0.7); }
+.room.secret-end {
+  border-color: rgba(201,162,39,0.75);
+  box-shadow: 0 0 0 1px rgba(201,162,39,0.25), 0 0 18px rgba(201,162,39,0.12);
+}
 .room h4 { margin: 0 0 6px; font-size: 0.95rem; }
 .room .links { font-size: 0.75rem; color: var(--muted); min-height: 2.2em; }
+.secret-link { color: var(--gold-soft); font-weight: 600; }
+.secret-passage {
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(201,162,39,0.55);
+  background:
+    linear-gradient(90deg, rgba(201,162,39,0.08), rgba(201,162,39,0.2), rgba(201,162,39,0.08)),
+    rgba(0,0,0,0.25);
+}
+.secret-passage-label {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--gold-soft);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.secret-passage-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  color: var(--parchment);
+}
+.secret-stairs {
+  color: var(--gold);
+  letter-spacing: 0.15em;
+  animation: secretPulse 1.8s ease-in-out infinite;
+}
+.secret-passage-note {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+}
+@keyframes secretPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
 
 .result {
   text-align: center;

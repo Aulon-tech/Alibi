@@ -60,6 +60,7 @@ namespace Alibi.Core
             {
                 var stmts = new List<Statement>();
                 var asked = new HashSet<string>();
+                var cache = new Dictionary<string, Statement>();
                 var candidates = Candidates(c);
                 var ev = solver.Evaluate(stmts);
                 while (ev.ViableCount > 1 && cost < limit)
@@ -72,7 +73,12 @@ namespace Alibi.Core
                     foreach (var q in candidates)
                     {
                         if (asked.Contains(q.Key)) continue;
-                        var st = MakeStatement(c, q, stmts.Count + 1);
+                        Statement st;
+                        if (!cache.TryGetValue(q.Key, out st))
+                        {
+                            st = MakeStatement(c, q, 0);
+                            cache[q.Key] = st;
+                        }
                         stmts.Add(st);
                         var e2 = solver.Evaluate(stmts, ev);
                         stmts.RemoveAt(stmts.Count - 1);
@@ -87,6 +93,7 @@ namespace Alibi.Core
                     }
                     if (best == null) return Unsolvable;
                     asked.Add(best.Key);
+                    bestSt.Id = stmts.Count + 1;
                     stmts.Add(bestSt);
                     cost += bestSt.Cost;
                     ev = bestEv;
