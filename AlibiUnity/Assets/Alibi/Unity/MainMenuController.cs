@@ -43,6 +43,8 @@ namespace Alibi.Unity
             seed = UnityEngine.Random.Range(1000, 9999);
             showcase = LevelCards.Card2();
             villa = MapBuilder.Build(transform, showcase);
+            HouseDressing.Build(villa);
+            HouseDressing.SetResidentsMode(villa, ResidentsMode.Never); // vitrina e menysë ka vetë figurat e saj
             SceneSetup.Lights(transform, villa.Bounds);
             rig = CameraRig.Create(transform, Theme.Night);
             rig.Target = villa.Bounds;
