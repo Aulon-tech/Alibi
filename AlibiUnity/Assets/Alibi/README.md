@@ -24,7 +24,7 @@ Ne loje: vila 3D me figurat (e plote = e konfirmuar, e tejdukshme = e mundshme, 
 ## Struktura e kodit
 
 - `Core/` – Model, QuestionEngine, CspSolver (AC-3 + backtracking per cdo hipoteze fajtori, edhe me deshmitar qe gabon nje here), DomainMatrix, GameSession (gjendjet CASE_LOADED deri ABANDONED), CaseGenerator, LieSelector, ParPolicy, LevelCards.
-- `Unity/` – GameManager, MapBuilder, RoomView, SuspectMarker, DeductionBoardView, PropagationAnimator, TimelineController, InterrogationPanel, CameraRig, MainMenuController dhe panelet e UI.
+- `Unity/` – GameManager, MapBuilder, HouseDressing + HouseSpawns (mobilje, drita, detaje roli, një person për dhomë), RoomView, SuspectMarker, DeductionBoardView, PropagationAnimator, TimelineController, InterrogationPanel, CameraRig, MainMenuController dhe panelet e UI.
 - `Editor/` – AlibiSetup (krijon skenat, Build Settings dhe materialin per URP ose Built-in).
 - `Tests/` – EditMode: kartat 1–4 sipas zgjidhjes se dokumentuar (përfshi R06 / TC-10), TC-01 deri TC-10, yjet, unikesia e gjeneratorit dhe zbulimi i rastit me defekt.
 - `Resources/AlibiFonts/` – Inter, Cormorant Garamond dhe JetBrains Mono (licenca OFL).

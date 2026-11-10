@@ -48,6 +48,7 @@ namespace Alibi.Unity
         void BuildWorld()
         {
             villa = MapBuilder.Build(transform, caseDef);
+            HouseDressing.Build(villa);
             SceneSetup.Lights(transform, villa.Bounds);
             rig = CameraRig.Create(transform, Theme.Night);
             rig.Target = villa.Bounds;
