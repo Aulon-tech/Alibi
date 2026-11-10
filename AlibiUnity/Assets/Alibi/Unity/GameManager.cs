@@ -49,6 +49,7 @@ namespace Alibi.Unity
         {
             villa = MapBuilder.Build(transform, caseDef);
             HouseDressing.Build(villa);
+            HouseDressing.SetResidentsMode(villa, ResidentsMode.Auto); // banori fshihet kur tabela e shfaq vetë atë të dyshuar
             SceneSetup.Lights(transform, villa.Bounds);
             rig = CameraRig.Create(transform, Theme.Night);
             rig.Target = villa.Bounds;
