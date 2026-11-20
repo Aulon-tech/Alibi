@@ -258,7 +258,7 @@ namespace Alibi.Core
                 Domains.Update(Eval);
             }
             outcome.Accepted = true;
-            outcome.Message = clue.Title + ": " + clue.Text + (rebuilt ? " Grafi i lëvizjes u përditësua (R06)." : "");
+            outcome.Message = clue.Title + ": " + clue.Text + (rebuilt ? " Tani kjo rrugë vlen për të gjithë." : "");
             if (Remaining <= 0)
             {
                 Phase = Phase.Accusing;
@@ -384,7 +384,7 @@ namespace Alibi.Core
                 text += ", bashkë me faktin e dosjes (dikush ishte në " + Case.Rooms[Case.CrimeRoom].Loc + when + ")";
             }
             text += ".";
-            if (Case.ErrorsAllowed > 0) text += " Kujdes: një dëshmitar i ndershëm mund të gabojë një herë (R05).";
+            if (Case.ErrorsAllowed > 0) text += " Kujdes: një dëshmitar i ndershëm mund të gabojë një herë pa dashje.";
             else text += " Dikush prej tyre gënjen.";
             return text;
         }

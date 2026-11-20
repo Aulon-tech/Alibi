@@ -36,6 +36,13 @@ namespace Alibi.Unity
         public static CaseDefinition PendingCase;
         public static string MenuNote;
         public static bool TutorialEnabled = true;
+        public static bool ExploreMode;
+
+        // Karta 1 luhet gjithmone ne 3D: detektivi ecen neper vile dhe pyet nga afer.
+        public static bool WalksIn(CaseDefinition c)
+        {
+            return c != null && c.CardNumber == 1;
+        }
 
         public static void StartCase(CaseDefinition c)
         {

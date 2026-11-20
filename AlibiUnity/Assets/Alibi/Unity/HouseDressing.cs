@@ -80,14 +80,14 @@ namespace Alibi.Unity
                 RoomView rv;
                 if (!view.Rooms.TryGetValue(r, out rv)) continue;
                 var pos = HouseSpawns.PositionIn(rv.Layout);
-                pos.x += 0.45f * perRoom[r]++; // vetëm nëse dy persona ndajnë dhomë (më pak dhoma se të dyshuar)
+                pos.x += 1.2f * perRoom[r]++;
                 var info = c.Suspects[s];
                 var go = new GameObject("Resident_" + info.Id);
                 go.transform.SetParent(parent, false);
                 go.transform.localPosition = pos;
                 var visual = new GameObject("Visual");
                 visual.transform.SetParent(go.transform, false);
-                visual.transform.localScale = Vector3.one * 0.92f;
+                visual.transform.localScale = Vector3.one * 1.8f;
                 var lit = kit.Mat(info.ColorHex, 0.35f);
                 var body = Part(visual.transform, PrimitiveType.Capsule, "Body", new Vector3(0, 0.4f, 0), new Vector3(0.36f, 0.4f, 0.36f), lit);
                 var head = Part(visual.transform, PrimitiveType.Sphere, "Head", new Vector3(0, 0.95f, 0), new Vector3(0.28f, 0.28f, 0.28f), lit);
@@ -146,6 +146,8 @@ namespace Alibi.Unity
         // Mobiljet e një dhome. Koordinatat (u, v) maten nga qoshja (X0, Z0) e dhomës; y0 = lartësia mbi dysheme.
         // Mobiljet qëndrojnë te muret (brenda 0.35 m) dhe nuk prekin dyert, kalimin e fshehtë Biblioteka–Zyra,
         // as rreshtat e figurave të Slot(): kështu klikimet dhe shënuesit mbeten të lirë.
+        // PS: position scale (matches MapBuilder.Scale for coordinate mapping)
+        // DS: dimension scale (makes furniture human-scale in the realistic rooms)
         sealed class Dresser
         {
             readonly Kit kit;
@@ -153,6 +155,8 @@ namespace Alibi.Unity
             readonly Transform parent;
             readonly RoomLayout l;
             readonly float w, d;
+            const float PS = MapBuilder.Scale;
+            const float DS = 2.2f;
 
             public Dresser(Kit kit, RoomView rv, Transform parent)
             {
@@ -170,7 +174,7 @@ namespace Alibi.Unity
 
             Vector3 P(float u, float v, float y)
             {
-                return new Vector3(l.X0 + u, l.Y + y, l.Z0 + v);
+                return new Vector3(l.X0 + u * PS, l.Y + y * DS, l.Z0 + v * PS);
             }
 
             void Finish(GameObject go, bool solid)
@@ -194,7 +198,7 @@ namespace Alibi.Unity
                 go.transform.SetParent(parent, false);
                 go.transform.localPosition = P(u, v, y0 + sy * 0.5f);
                 go.transform.localRotation = Quaternion.Euler(0f, rotY, 0f);
-                go.transform.localScale = new Vector3(sx, sy, sz);
+                go.transform.localScale = new Vector3(sx * DS, sy * DS, sz * DS);
                 go.GetComponent<Renderer>().sharedMaterial = mat;
                 Finish(go, solid);
                 return go;
@@ -206,7 +210,7 @@ namespace Alibi.Unity
                 go.name = name;
                 go.transform.SetParent(parent, false);
                 go.transform.localPosition = P(u, v, y0 + h * 0.5f);
-                go.transform.localScale = new Vector3(dia, h * 0.5f, dia);
+                go.transform.localScale = new Vector3(dia * DS, h * 0.5f * DS, dia * DS);
                 go.GetComponent<Renderer>().sharedMaterial = mat;
                 Finish(go, solid);
                 return go;
@@ -218,7 +222,7 @@ namespace Alibi.Unity
                 go.name = name;
                 go.transform.SetParent(parent, false);
                 go.transform.localPosition = P(u, v, yCenter);
-                go.transform.localScale = new Vector3(dia, dia, dia);
+                go.transform.localScale = new Vector3(dia * DS, dia * DS, dia * DS);
                 go.GetComponent<Renderer>().sharedMaterial = mat;
                 Finish(go, false);
                 return go;
@@ -283,9 +287,22 @@ namespace Alibi.Unity
                 var light = go.AddComponent<Light>();
                 light.type = LightType.Point;
                 light.color = color;
-                light.range = range;
+                light.range = range * DS;
                 light.intensity = intensity;
                 light.shadows = LightShadows.None;
+            }
+
+            void CeilingLamp(Color color, float range, float intensity, string name)
+            {
+                var go = new GameObject(name);
+                go.transform.SetParent(parent, false);
+                go.transform.localPosition = new Vector3(l.Center.x, l.Y + MapBuilder.WallHeight - 0.3f, l.Center.z);
+                var light = go.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.color = color;
+                light.range = range;
+                light.intensity = intensity;
+                light.shadows = LightShadows.Soft;
             }
 
             public void Dress()
@@ -305,21 +322,20 @@ namespace Alibi.Unity
                 RoomLight();
             }
 
-            // Një dritë e ngrohtë në çdo dhomë, mbi mes të saj.
             void RoomLight()
             {
                 Color color = new Color(1f, 0.8f, 0.55f);
-                float intensity = 0.9f;
+                float intensity = 1.4f;
                 switch (l.Id)
                 {
                     case "KU": color = new Color(1f, 0.86f, 0.64f); break;
                     case "BI": color = new Color(1f, 0.74f, 0.45f); break;
                     case "ZY": color = new Color(1f, 0.87f, 0.68f); break;
-                    case "BO": color = new Color(1f, 0.66f, 0.38f); intensity = 0.7f; break;
-                    case "SH": intensity = 0.7f; break;
+                    case "BO": color = new Color(1f, 0.66f, 0.38f); intensity = 1.0f; break;
+                    case "SH": intensity = 1.0f; break;
                 }
-                float range = Mathf.Max(w, d) * 1.1f + 0.7f;
-                Lamp(P(w * 0.5f, d * 0.5f, 1.45f), color, range, intensity, "RoomLight_" + l.Id);
+                float range = Mathf.Max(w, d) * 0.65f + 4f;
+                CeilingLamp(color, range, intensity, "RoomLight_" + l.Id);
             }
 
             void Hall()

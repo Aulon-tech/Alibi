@@ -135,8 +135,8 @@ namespace Alibi.Core
             new LevelSpec { Level = 1, Name = "Mësimi", SuspectIds = new[] { "A", "B", "D", "E" }, RoomIds = RoomsL1, Hours = HoursL1, Budget = 12, UseGraph = false, Types = new[] { CaseType.Vrasja }, Unlocks = "Vetëm Vrasja. Mësohet tabela dhe menyja e pyetjeve.", Playable = true },
             new LevelSpec { Level = 2, Name = "Lëvizja", SuspectIds = new[] { "A", "B", "D", "E", "F" }, RoomIds = RoomsL2, Hours = HoursL2, Budget = 12, UseGraph = true, Types = new[] { CaseType.Vrasja }, Unlocks = "Grafi i lëvizjes: askush nuk zhvendoset pa kaluar nëpër dhomat ndërmjetëse.", Playable = true },
             new LevelSpec { Level = 3, Name = "Sabotimi", SuspectIds = new[] { "A", "B", "D", "E", "F" }, RoomIds = RoomsL2, Hours = HoursL3, Budget = 11, UseGraph = true, Types = new[] { CaseType.Sabotimi }, Unlocks = "Dëshmitari me gabim (Karta 3) dhe Sabotimi: ora e krimit nuk dihet.", Playable = true },
-            new LevelSpec { Level = 4, Name = "Kalimi", SuspectIds = new[] { "A", "B", "D", "E", "F", "G" }, RoomIds = RoomsL4, Hours = HoursL4, Budget = 12, UseGraph = true, Types = new[] { CaseType.Vjedhja }, Unlocks = "Vjedhja: dosja lëviz me hajnin (R10), pyetja Q6 për sendin, «Kërko dhomën» dhe kalimi i fshehtë Biblioteka–Zyra (R06).", Playable = true },
-            new LevelSpec { Level = 5, Name = "Fajtori", Unlocks = "Të tria llojet së bashku dhe refuzimet (R10).", Playable = false, Budget = 9 },
+            new LevelSpec { Level = 4, Name = "Kalimi", SuspectIds = new[] { "A", "B", "D", "E", "F", "G" }, RoomIds = RoomsL4, Hours = HoursL4, Budget = 12, UseGraph = true, Types = new[] { CaseType.Vjedhja }, Unlocks = "Vjedhja: dosja lëviz me hajnin, pyetja për dosjen, «Kërko dhomën» dhe kalimi i fshehtë Biblioteka–Zyra.", Playable = true },
+            new LevelSpec { Level = 5, Name = "Fajtori", Unlocks = "Të tria llojet e krimit së bashku.", Playable = false, Budget = 9 },
             new LevelSpec { Level = 6, Name = "I pafund", Unlocks = "Lloj dhe hartë të rastësishme.", Playable = false }
         };
 
@@ -178,10 +178,10 @@ namespace Alibi.Core
 
         static void BaseRules(CaseDefinition c)
         {
-            c.Rules.Add("Çdo i dyshuar ndodhet në saktësisht një dhomë në çdo orë (R01).");
-            c.Rules.Add("Të dyshuarit e ndershëm thonë gjithmonë të vërtetën (R03).");
-            c.Rules.Add("Fajtori gënjen të paktën një herë (R04). Deklarata e dikujt për vetveten nuk e përjashton atë.");
-            c.Rules.Add("Fajtori duhet të ketë qenë në " + c.Rooms[c.CrimeRoom].Loc + (c.CrimeTimeKnown ? " në " + c.Hours[c.CrimeTime] : "") + " (R08).");
+            c.Rules.Add("Çdo person është në një dhomë në çdo orë.");
+            c.Rules.Add("Të pafajshmit thonë gjithmonë të vërtetën. Fajtori gënjen të paktën një herë.");
+            c.Rules.Add("Ajo që dikush thotë për veten nuk e pastron. Beso atë që thonë të tjerët për të.");
+            c.Rules.Add("Fajtori ishte në " + c.Rooms[c.CrimeRoom].Loc + (c.CrimeTimeKnown ? " në " + c.Hours[c.CrimeTime] : ", por ora nuk dihet") + ".");
         }
 
         public static CaseDefinition Card1()
@@ -215,14 +215,14 @@ namespace Alibi.Core
             };
             c.Cover = Villa.Path(c, "DN", "SA", "HO");
             BaseRules(c);
-            c.Rules.Add("Pa graf lëvizjeje: në këtë nivel lëvizja mes dhomave nuk kufizohet.");
+            c.Rules.Add("Në këtë nivel, çdokush mund të shkojë në çdo dhomë.");
             int A = 0, B = 1;
             int bi = c.RoomIndex("BI");
-            c.Tutorial.Add(new TutorialStep { Title = "Mirë se vjen, detektiv", Text = "Krimi ndodhi në Bibliotekë në 21:00. Detyra jote nuk është ta hamendësosh fajtorin, por ta provosh me deklaratat e të tjerëve." });
-            c.Tutorial.Add(new TutorialStep { Title = "Deklarata për vetveten nuk mjafton", Text = "Nëse dikush thotë «isha në Sallon», kjo nuk e përjashton: mund të jetë fajtori që gënjen. Përjashtimi vjen nga deklarata e një personi tjetër (R03, R04)." });
-            c.Tutorial.Add(new TutorialStep { Title = "Hapi 1", Text = "Pyet Artën: «Kush ishte me ty në 21:00?» (kosto 2).", Fill = Question.Make(A, QType.Q4, 1) });
-            c.Tutorial.Add(new TutorialStep { Title = "Hapi 2", Text = "Arta ishte me Blerimin dhe Elmazin. Tani pyete: «A ke qenë ndonjëherë në Bibliotekë?»", Fill = Question.Make(A, QType.Q2, -1, bi) });
-            c.Tutorial.Add(new TutorialStep { Title = "Hapi 3", Text = "Arta nuk ka qenë kurrë në Bibliotekë, pra Blerimi dhe Elmazi që ishin me të në 21:00 dolën jashtë dyshimit. Pyet Blerimin: «A e ke parë Artën në 21:00?»", Fill = Question.Make(B, QType.Q3, 1, -1, A) });
+            c.Tutorial.Add(new TutorialStep { Title = "Mirë se vjen, detektiv", Text = "Krimi ndodhi në Bibliotekë në 21:00. Ec me WASD dhe afrohu dikujt për ta pyetur. Mos e hamendëso fajtorin: provoje me atë që thonë të tjerët." });
+            c.Tutorial.Add(new TutorialStep { Title = "Deklarata për vetveten nuk mjafton", Text = "Nëse dikush thotë «isha në Sallon», kjo nuk e pastron: mund të jetë fajtori që gënjen. Beso atë që thonë të tjerët për të." });
+            c.Tutorial.Add(new TutorialStep { Title = "Hapi 1", Text = "Shko te Arta në Kuzhinë. Shtyp «Plotëso pyetjen», pastaj Enter: «Kush ishte me ty në 21:00?» (kosto 2).", Fill = Question.Make(A, QType.Q4, 1) });
+            c.Tutorial.Add(new TutorialStep { Title = "Hapi 2", Text = "Arta ishte me Blerimin dhe Elmazin. Tani pyete Artën: «A ke qenë ndonjëherë në Bibliotekë?»", Fill = Question.Make(A, QType.Q2, -1, bi) });
+            c.Tutorial.Add(new TutorialStep { Title = "Hapi 3", Text = "Arta nuk ka qenë kurrë në Bibliotekë, pra Blerimi dhe Elmazi që ishin me të në 21:00 dolën jashtë dyshimit. Shko te Blerimi në Dhomën e ngrënies dhe pyete: «A e ke parë Artën në 21:00?»", Fill = Question.Make(B, QType.Q3, 1, -1, A) });
             c.Tutorial.Add(new TutorialStep { Title = "Hapi 4", Text = "Blerimi e konfirmon. Pyete edhe: «A ke qenë ndonjëherë në Bibliotekë?»", Fill = Question.Make(B, QType.Q2, -1, bi) });
             c.Tutorial.Add(new TutorialStep { Title = "Mbeti një kandidate", Text = "Arta ishte me Blerimin, që nuk ka qenë kurrë në Bibliotekë: edhe ajo doli jashtë dyshimit. Mbetet vetëm Drita. Shtyp Akuzo.", Accuse = true });
             c.Prepare();
@@ -261,8 +261,8 @@ namespace Alibi.Core
             };
             c.Cover = Villa.Path(c, "HO", "HO", "SA", "SA");
             BaseRules(c);
-            c.Rules.Add("Lëvizja vetëm mes dhomave të lidhura, një kalim për orë; qëndrimi në vend lejohet (R02).");
-            c.Rules.Add("Lidhjet: " + Villa.EdgeList(c) + ".");
+            c.Rules.Add("Në çdo orë, secili mund të shkojë vetëm në një dhomë fqinje, ose të qëndrojë aty ku është.");
+            c.Rules.Add("Dhomat fqinje: " + Villa.EdgeList(c) + ".");
             c.Prepare();
             return c;
         }
@@ -301,8 +301,8 @@ namespace Alibi.Core
             c.Cover = Villa.Path(c, "SA", "SA", "SA", "SA", "SA");
             c.Mistakes.Add(new MistakeSpec { Suspect = c.SuspectIndex("D"), Type = QType.Q1, Time = 1, WrongRoom = c.RoomIndex("KU") });
             BaseRules(c);
-            c.Rules.Add("Lëvizja vetëm mes dhomave të lidhura, një kalim për orë (R02). Lidhjet: " + Villa.EdgeList(c) + ".");
-            c.Rules.Add("Një dëshmitar i ndershëm gabon pa dashje në një përgjigje të vetme (R05): një kundërshtim i vetëm nuk mjafton, duhen dy të pavarura.");
+            c.Rules.Add("Në çdo orë, secili mund të shkojë vetëm në një dhomë fqinje. Dhomat fqinje: " + Villa.EdgeList(c) + ".");
+            c.Rules.Add("Kujdes: një dëshmitar i ndershëm gabon një herë pa dashje. Një kontradiktë e vetme nuk mjafton, duhen dy.");
             c.Prepare();
             return c;
         }
@@ -350,11 +350,11 @@ namespace Alibi.Core
                 RevealsSecret = true
             });
             BaseRules(c);
-            c.Rules.Add("Lëvizja vetëm mes dhomave të lidhura, një kalim për orë (R02). Lidhjet e njohura: " + Villa.EdgeList(c) + ".");
-            c.Rules.Add("Lloji: Vjedhja — dihet sendi (dosja) dhe dhoma e tij (Zyra); duhet të provosh kush e mori dhe në cilën orë (R09).");
-            c.Rules.Add("Sendi lëviz vetëm bashkë me një person (R10): para vjedhjes dosja është në Zyrë, pas saj është gjithmonë me hajnin.");
-            c.Rules.Add("Pyetja Q6 «A e ke parë dosjen në orën X?» kushton 1 dhe tregon nëse dikush ishte në të njëjtën dhomë me dosjen.");
-            c.Rules.Add("Prova fizike mund të zbulojë kalimin e fshehtë Biblioteka–Zyra; pastaj lëvizjet rillogariten (R06). Kërko dhomën me butonin «Kërko» (kosto 1).");
+            c.Rules.Add("Në çdo orë, secili mund të shkojë vetëm në një dhomë fqinje. Dhomat fqinje: " + Villa.EdgeList(c) + ".");
+            c.Rules.Add("Dosja u vodh nga Zyra. Gjej kush e mori dhe në cilën orë.");
+            c.Rules.Add("Para vjedhjes dosja është në Zyrë. Pas vjedhjes, ajo është gjithmonë me hajnin.");
+            c.Rules.Add("Pyetja «A e ke parë dosjen?» kushton 1 pikë: tregon nëse dikush ishte në të njëjtën dhomë me dosjen.");
+            c.Rules.Add("Butoni «Kërko» (1 pikë) kontrollon një dhomë. Mund të gjesh një kalim të fshehtë Biblioteka–Zyra.");
             c.Prepare();
             return c;
         }

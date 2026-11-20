@@ -26,12 +26,15 @@ namespace Alibi.Unity
 
         bool hasTargetRotation;
         Quaternion targetRotation;
+        Quaternion restRotation;
+        float talkUntil = -1f;
 
         // Shared materials cache
         static Shader s_cachedShader;
         static Material s_sharedSkinMat;
         static Material s_sharedHairMat;
         static Material s_sharedLegsMat;
+        static Material s_sharedEyeMat;
 
         const float TurnSpeed = 3.5f;
         const float TalkBlendSpeed = 4.5f;
@@ -39,6 +42,11 @@ namespace Alibi.Unity
         void Awake()
         {
             phaseOffset = Random.Range(0f, Mathf.PI * 2f);
+        }
+
+        void Start()
+        {
+            restRotation = transform.rotation;
         }
 
         public static SuspectFigure Build(Transform parent, SuspectInfo info)
@@ -86,6 +94,12 @@ namespace Alibi.Unity
             // Head (sphere, diameter ~0.11f)
             CreatePrimitivePart(PrimitiveType.Sphere, "Head", figure.headPivot, new Vector3(0f, 0.06f, 0f), new Vector3(0.11f, 0.11f, 0.11f), skinMat);
 
+            // Face on +Z (the side LookAt turns toward the target)
+            var eyeMat = GetEyeMaterial();
+            CreatePrimitivePart(PrimitiveType.Sphere, "EyeL", figure.headPivot, new Vector3(-0.021f, 0.07f, 0.048f), new Vector3(0.016f, 0.016f, 0.016f), eyeMat);
+            CreatePrimitivePart(PrimitiveType.Sphere, "EyeR", figure.headPivot, new Vector3(0.021f, 0.07f, 0.048f), new Vector3(0.016f, 0.016f, 0.016f), eyeMat);
+            CreatePrimitivePart(PrimitiveType.Cube, "Nose", figure.headPivot, new Vector3(0f, 0.055f, 0.055f), new Vector3(0.012f, 0.016f, 0.014f), skinMat);
+
             // Hair (small cube on top of the head)
             CreatePrimitivePart(PrimitiveType.Cube, "Hair", figure.headPivot, new Vector3(0f, 0.115f, -0.005f), new Vector3(0.108f, 0.04f, 0.108f), hairMat);
 
@@ -118,6 +132,21 @@ namespace Alibi.Unity
         public void SetTalking(bool on)
         {
             isTalking = on;
+            talkUntil = -1f;
+        }
+
+        // Talks for a few seconds, then goes back to idle
+        public void Talk(float seconds)
+        {
+            isTalking = true;
+            talkUntil = Time.time + seconds;
+        }
+
+        // Turns back to the direction the figure had at spawn
+        public void ClearLook()
+        {
+            targetRotation = restRotation;
+            hasTargetRotation = true;
         }
 
         public void LookAt(Vector3 target)
@@ -146,6 +175,12 @@ namespace Alibi.Unity
             if (headPivot != null) headPivot.localPosition = baseHeadPivotPos + new Vector3(0f, breathY, 0f);
             if (leftArmPivot != null) leftArmPivot.localPosition = baseLeftArmPivotPos + new Vector3(0f, breathY, 0f);
             if (rightArmPivot != null) rightArmPivot.localPosition = baseRightArmPivotPos + new Vector3(0f, breathY, 0f);
+
+            if (talkUntil > 0f && Time.time > talkUntil)
+            {
+                isTalking = false;
+                talkUntil = -1f;
+            }
 
             // 2. Talking and Idle motion blend
             float targetWeight = isTalking ? 1f : 0f;
@@ -265,6 +300,13 @@ namespace Alibi.Unity
             if (s_sharedHairMat == null)
                 s_sharedHairMat = CreateOpaqueMaterial(new Color(0.18f, 0.14f, 0.11f), 0.15f);
             return s_sharedHairMat;
+        }
+
+        static Material GetEyeMaterial()
+        {
+            if (s_sharedEyeMat == null)
+                s_sharedEyeMat = CreateOpaqueMaterial(new Color(0.08f, 0.08f, 0.1f), 0.6f);
+            return s_sharedEyeMat;
         }
 
         static Material GetLegsMaterial()

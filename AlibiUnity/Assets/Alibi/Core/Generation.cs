@@ -425,18 +425,18 @@ namespace Alibi.Core
                 c.Objective = "Gjej fajtorin dhe akuzo me provë — person, dhomë dhe orë.";
                 c.Premise = "Pronari i vilës u gjet i vdekur në " + room.Loc + ", në " + c.Hours[c.CrimeTime] + ". Askush nuk e pa çfarë ndodhi.";
             }
-            c.Rules.Add("Çdo i dyshuar ndodhet në saktësisht një dhomë në çdo orë (R01).");
-            c.Rules.Add("Të dyshuarit e ndershëm thonë gjithmonë të vërtetën (R03). Fajtori gënjen të paktën një herë (R04).");
-            if (sabotage) c.Rules.Add("Fajtori ka qenë në " + room.Loc + " në orën e sabotimit, të cilën duhet ta provosh (R08, R09).");
+            c.Rules.Add("Çdo person është në një dhomë në çdo orë.");
+            c.Rules.Add("Të pafajshmit thonë gjithmonë të vërtetën. Fajtori gënjen të paktën një herë.");
+            if (sabotage) c.Rules.Add("Fajtori ishte në " + room.Loc + " në orën e sabotimit. Gjej personin dhe orën.");
             else if (type == CaseType.Vjedhja)
             {
-                c.Rules.Add("Hajni ka qenë në " + room.Loc + " në orën kur e mori " + c.ItemAcc + "; personi dhe ora duhen provuar (R08, R09).");
-                c.Rules.Add("Sendi lëviz vetëm bashkë me një person (R10): para vjedhjes është në " + room.Loc + ", pas saj është gjithmonë me hajnin.");
+                c.Rules.Add("Hajni ishte në " + room.Loc + " kur e mori " + c.ItemAcc + ". Gjej personin dhe orën.");
+                c.Rules.Add("Para vjedhjes " + c.ItemName + " është në " + room.Loc + ". Pas vjedhjes, është gjithmonë me hajnin.");
             }
-            else c.Rules.Add("Fajtori duhet të ketë qenë në " + room.Loc + " në " + c.Hours[c.CrimeTime] + " (R08).");
-            if (c.UseGraph) c.Rules.Add("Lëvizja vetëm mes dhomave të lidhura, një kalim për orë (R02). Lidhjet: " + Villa.EdgeList(c) + ".");
-            else c.Rules.Add("Pa graf lëvizjeje në këtë nivel.");
-            c.Rules.Add("Rasti u gjenerua me seed " + seed + " dhe u kontrollua që të ketë saktësisht një zgjidhje. Par-i i llogaritur nga ParPolicy: " + par + ".");
+            else c.Rules.Add("Fajtori ishte në " + room.Loc + " në " + c.Hours[c.CrimeTime] + ".");
+            if (c.UseGraph) c.Rules.Add("Në çdo orë, secili mund të shkojë vetëm në një dhomë fqinje. Dhomat fqinje: " + Villa.EdgeList(c) + ".");
+            else c.Rules.Add("Në këtë nivel, çdokush mund të shkojë në çdo dhomë.");
+            c.Rules.Add("Ky rast ka vetëm një zgjidhje të saktë (seed " + seed + ", par " + par + ").");
             reason = null;
             return c;
         }

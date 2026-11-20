@@ -34,13 +34,14 @@ namespace Alibi.Unity
             {
                 var fig = SuspectFigure.Build(figuresRoot.transform, suspects[i]);
                 fig.transform.localPosition = new Vector3(startX + i * spacing, 0f, 0f);
+                fig.transform.localRotation = Quaternion.Euler(0f, 180f, 0f); // face the camera
                 figures.Add(fig);
             }
 
             // Look target marker (sphere)
             marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             marker.name = "LookTargetMarker";
-            marker.transform.position = new Vector3(0f, 0.25f, 1.8f);
+            marker.transform.position = new Vector3(0f, 0.25f, -1.2f);
             marker.transform.localScale = Vector3.one * 0.14f;
 
             var col = marker.GetComponent<Collider>();
@@ -73,10 +74,10 @@ namespace Alibi.Unity
                 float dx = 0f;
                 float dz = 0f;
 
-                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) dx -= 1f;
-                if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) dx += 1f;
-                if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) dz += 1f;
-                if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) dz -= 1f;
+                if (ExploreInput.Held(ExploreKey.Left)) dx -= 1f;
+                if (ExploreInput.Held(ExploreKey.Right)) dx += 1f;
+                if (ExploreInput.Held(ExploreKey.Up)) dz += 1f;
+                if (ExploreInput.Held(ExploreKey.Down)) dz -= 1f;
 
                 if (dx != 0f || dz != 0f)
                 {
@@ -86,7 +87,7 @@ namespace Alibi.Unity
             }
 
             // T toggles SetTalking on all figures
-            if (Input.GetKeyDown(KeyCode.T))
+            if (ExploreInput.Pressed(ExploreKey.TestTalk))
             {
                 isTalking = !isTalking;
                 for (int i = 0; i < figures.Count; i++)
@@ -96,7 +97,7 @@ namespace Alibi.Unity
             }
 
             // L calls LookAt on all figures with marker position
-            if (Input.GetKeyDown(KeyCode.L) || Input.GetKey(KeyCode.L))
+            if (ExploreInput.Held(ExploreKey.TestLook))
             {
                 if (marker != null)
                 {

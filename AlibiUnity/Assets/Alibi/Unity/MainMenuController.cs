@@ -112,13 +112,21 @@ namespace Alibi.Unity
             }
         }
 
-        static UIButton MenuButton(Transform parent, string title, string sub, bool primary, Action onClick, float y)
+        static UIButton MenuButton(Transform parent, string title, string sub, string icon, bool primary, Action onClick, float y)
         {
             var b = UI.Button(parent, null, primary ? BtnStyle.Primary : BtnStyle.Chip, onClick, 17, 12);
-            UI.Place(b.Rect, 0, y, 470, 74);
-            if (!primary) b.Background.color = new Color(0.08f, 0.09f, 0.12f, 0.92f);
-            UI.LabelAt(b.Rect, title, Theme.SansSemi, 19, primary ? Theme.Ink : Theme.Text, 22, 13, 400, 26);
-            UI.LabelAt(b.Rect, sub, Theme.Sans, 14, primary ? Theme.Hex("#3D3017") : Theme.Muted, 22, 41, 420, 22);
+            UI.Place(b.Rect, 0, y, 500, 78);
+            if (!primary)
+            {
+                b.Background.color = new Color(0.06f, 0.07f, 0.1f, 0.92f);
+                b.Border.color = Theme.WithAlpha(Theme.Gold, 0.15f);
+            }
+            var iconBg = UI.Panel(b.Rect, "Icon", primary ? Theme.WithAlpha(Theme.Ink, 0.15f) : Theme.WithAlpha(Theme.Gold, 0.12f), 12, false);
+            UI.Place(iconBg.rectTransform, 16, 18, 42, 42);
+            var il = UI.Label(iconBg.transform, icon, Theme.Serif, 22, primary ? Theme.Ink : Theme.Gold, TextAnchor.MiddleCenter);
+            UI.Stretch(il.rectTransform, 0, 0, 0, 0);
+            UI.LabelAt(b.Rect, title, Theme.SansSemi, 19, primary ? Theme.Ink : Theme.Text, 70, 14, 400, 26);
+            UI.LabelAt(b.Rect, sub, Theme.Sans, 14, primary ? Theme.Hex("#3D3017") : Theme.Muted, 70, 42, 420, 22);
             return b;
         }
 
@@ -126,52 +134,73 @@ namespace Alibi.Unity
         {
             UI.Clear(screen);
             rig.Frame = frame;
+
+            // Decorative villa frame border
+            var frameBorder = UI.Card(screen, "FrameBorder", new Color(0, 0, 0, 0), Theme.WithAlpha(Theme.Gold, 0.12f), 14);
+            frameBorder.rectTransform.anchorMin = new Vector2(0, 0);
+            frameBorder.rectTransform.anchorMax = new Vector2(1, 1);
+            frameBorder.rectTransform.offsetMin = new Vector2(748, 108);
+            frameBorder.rectTransform.offsetMax = new Vector2(-48, -68);
+            frameBorder.raycastTarget = false;
+
             var left = UI.Rect(screen, "Left");
             left.anchorMin = new Vector2(0, 0);
             left.anchorMax = new Vector2(0, 1);
             left.pivot = new Vector2(0, 1);
             left.offsetMin = new Vector2(64, 40);
-            left.offsetMax = new Vector2(64 + 620, -64);
+            left.offsetMax = new Vector2(64 + 660, -64);
             float y = 0;
-            UI.LabelAt(left, "LOJË MISTERI DEDUKTIVE · 1 LOJTAR · OFFLINE", Theme.Mono, 15, Theme.Gold, 0, y, 620, 22);
-            y += 30;
+
+            // Kicker with decorative line
+            var kickerLine = UI.Panel(left, "KickerLine", Theme.WithAlpha(Theme.Gold, 0.3f), 0, false);
+            UI.Place(kickerLine.rectTransform, 0, 10, 36, 1);
+            UI.LabelAt(left, "LOJË MISTERI DEDUKTIVE · 1 LOJTAR · OFFLINE", Theme.Mono, 14, Theme.Gold, 44, y, 600, 22);
+            y += 32;
+
             var title = UI.LabelAt(left, "ALIBI", Theme.Serif, 150, Theme.Parchment, -6, y, 640, 150);
             title.horizontalOverflow = HorizontalWrapMode.Overflow;
             y += 150;
-            y += Panels.Paragraph(left, "Çdo dëshmi është një kufizim. Fajtori gënjen, por gënjeshtra e tij del në dritë sapo dy deklarata nuk mund të jenë të vërteta njëkohësisht.", Theme.Sans, 20, Theme.Text2, 0, y, 520) + 22;
+            y += Panels.Paragraph(left, "Çdo dëshmi është një kufizim. Fajtori gënjen, por gënjeshtra e tij del në dritë sapo dy deklarata nuk mund të jenë të vërteta njëkohësisht.", Theme.Sans, 20, Theme.Text2, 0, y, 540) + 24;
+
             if (!string.IsNullOrEmpty(AlibiFlow.MenuNote))
             {
-                var note = UI.Card(left, "Note", Theme.Panel2, Theme.Line2, 10);
-                float nh = Panels.Paragraph(note.transform, AlibiFlow.MenuNote, Theme.Sans, 15, Theme.Text, 14, 10, 442) + 20;
-                UI.Place(note.rectTransform, 0, y, 470, nh);
+                var note = UI.Card(left, "Note", Theme.Hex("#141924"), Theme.WithAlpha(Theme.Gold, 0.2f), 10);
+                float nh = Panels.Paragraph(note.transform, AlibiFlow.MenuNote, Theme.Sans, 15, Theme.Text, 14, 10, 472) + 20;
+                UI.Place(note.rectTransform, 0, y, 500, nh);
                 y += nh + 14;
             }
             int next = AlibiFlow.NextCard();
             var nextCase = LevelCards.Card(next);
-            MenuButton(left, "Vazhdo", nextCase.Title + " · " + nextCase.Kicker.ToLowerInvariant(), true, () => AlibiFlow.StartCase(LevelCards.Card(next)), y);
-            y += 84;
-            MenuButton(left, "Kartat e niveleve", "Progresioni: Faza 1 deri në Fazën 4, me zgjidhje të verifikuara", false, ShowCards, y);
-            y += 84;
-            MenuButton(left, "Rast i ri", "Gjeneratori: raste të reja me zgjidhje të garantuar unike", false, ShowNewCase, y);
-            y += 84;
-            MenuButton(left, "Si luhet", "Rregullat në një minutë", false, ShowHowTo, y);
-            y += 84;
-            MenuButton(left, "Dil", "Mbyll lojën", false, Quit, y);
+            MenuButton(left, "Vazhdo", nextCase.Title + " · " + nextCase.Kicker.ToLowerInvariant(), "▶", true, () => AlibiFlow.StartCase(LevelCards.Card(next)), y);
+            y += 90;
+            MenuButton(left, "Kartat e niveleve", "Progresioni: Faza 1 deri në Fazën 4, me zgjidhje të verifikuara", "✧", false, ShowCards, y);
+            y += 90;
+            MenuButton(left, "Rast i ri", "Gjeneratori: raste të reja me zgjidhje të garantuar unike", "⚙", false, ShowNewCase, y);
+            y += 90;
+            MenuButton(left, "Si luhet", "Rregullat në një minutë", "?", false, ShowHowTo, y);
+            y += 90;
+            MenuButton(left, "Dil", "Mbyll lojën", "✕", false, Quit, y);
 
+            // Footer with progress bar feel
             var foot = UI.Rect(screen, "Footer");
             foot.anchorMin = foot.anchorMax = new Vector2(0, 0);
             foot.pivot = new Vector2(0, 0);
-            foot.anchoredPosition = new Vector2(64, 30);
-            foot.sizeDelta = new Vector2(900, 70);
+            foot.anchoredPosition = new Vector2(64, 24);
+            foot.sizeDelta = new Vector2(900, 76);
+            var footBg = foot.gameObject.AddComponent<Image>();
+            footBg.sprite = Theme.Rounded(8);
+            footBg.type = Image.Type.Sliced;
+            footBg.color = new Color(0.04f, 0.05f, 0.07f, 0.7f);
+            footBg.raycastTarget = false;
             var progress = new List<string>();
             for (int k = 1; k <= 4; k++)
             {
                 string state = AlibiFlow.CardWon(k) ? AlibiFlow.BestStars(k) + "/3 yje" : AlibiFlow.CardUnlocked(k) ? "e hapur" : "e kyçur";
-                progress.Add("Karta " + k + ": " + state);
+                progress.Add("<color=#D2AD62>Karta " + k + "</color>: " + state);
             }
-            UI.LabelAt(foot, "Progresi — " + string.Join(" · ", progress.ToArray()), Theme.Sans, 14, Theme.Muted, 0, 0, 900, 20);
-            UI.LabelAt(foot, "Grupi 6 · Dea Berisha · Nysret Ukaj · Aulon Miftari · Enis Dapko", Theme.Sans, 14, Theme.Muted, 0, 22, 900, 20);
-            UI.LabelAt(foot, "demo v0.2 · Unity · Alibi.Core (C# pa UnityEngine) + Alibi.Unity", Theme.Mono, 13, Theme.Dim, 0, 44, 900, 20);
+            UI.LabelAt(foot, "Progresi — " + string.Join(" · ", progress.ToArray()), Theme.Sans, 14, Theme.Text2, 14, 8, 870, 20);
+            UI.LabelAt(foot, "Grupi 6 · Dea Berisha · Nysret Ukaj · Aulon Miftari · Enis Dapko", Theme.Sans, 13, Theme.Muted, 14, 30, 870, 18);
+            UI.LabelAt(foot, "demo v0.2 · Unity · Alibi.Core (C# pa UnityEngine) + Alibi.Unity", Theme.Mono, 12, Theme.Dim, 14, 50, 870, 18);
 
             var caption = UI.Rect(screen, "Caption");
             caption.anchorMin = caption.anchorMax = new Vector2(1, 0);
@@ -324,8 +353,12 @@ namespace Alibi.Unity
         void ShowHowTo()
         {
             UI.Clear(overlay);
-            var shade = Panels.Overlay(overlay, "HowTo");
-            Panels.HowTo(shade, () => UI.Clear(overlay));
+            var iv = gameObject.AddComponent<IntroVideo>();
+            iv.Play(overlay, null, () =>
+            {
+                UI.Clear(overlay);
+                if (iv != null) Destroy(iv);
+            });
         }
 
         void Quit()

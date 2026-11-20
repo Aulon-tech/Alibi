@@ -190,29 +190,46 @@ namespace Alibi.Unity
             if (o == null || o.Statement == null) return 0;
             var st = o.Statement;
             var sus = C.Suspects[st.Suspect];
-            var card = UI.Card(content, "LastAnswer", Theme.Hex("#171B24"), Theme.Line2, 14);
+            var card = UI.Card(content, "LastAnswer", Theme.Hex("#0D1017"), Theme.WithAlpha(Theme.Gold, 0.25f), 14);
             var root = card.transform;
-            float pad = 18, iw = w - pad * 2, iy = 16;
-            UI.Avatar(root, sus, 38, pad, iy);
-            UI.LabelAt(root, sus.Def + " · #" + st.Id, Theme.SansSemi, 17, Theme.Text, pad + 50, iy, iw - 50, 22);
-            UI.LabelAt(root, st.QuestionText, Theme.Sans, 14, Theme.Muted, pad + 50, iy + 22, iw - 50, 20);
-            iy += 48;
-            iy += Panels.Paragraph(root, "«" + st.Text + "»", Theme.SerifItalic, 28, Theme.Parchment, pad, iy, iw) + 4;
-            iy += Panels.Paragraph(root, "Kufizim i ri: " + st.Formal, Theme.Mono, 14, Theme.Gold, pad, iy, iw) + 8;
+            float pad = 18, iw = w - pad * 2, iy = 14;
+
+            // Header: suspect info
+            UI.Avatar(root, sus, 42, pad, iy);
+            UI.LabelAt(root, sus.Def, Theme.SansBold, 18, Theme.Text, pad + 54, iy + 2, iw - 54, 22);
+            UI.LabelAt(root, st.QuestionText + "  #" + st.Id, Theme.Sans, 13, Theme.Muted, pad + 54, iy + 24, iw - 54, 18);
+            iy += 52;
+
+            // Speech bubble with answer
+            var bubble = UI.Card(root, "Bubble", Theme.WithAlpha(Theme.Gold, 0.06f), Theme.WithAlpha(Theme.Gold, 0.15f), 10);
+            float bubPad = 14;
+            float ansH = Panels.Paragraph(bubble.transform, "«" + st.Text + "»", Theme.SerifItalic, 26, Theme.Parchment, bubPad, bubPad, iw - bubPad * 2);
+            float bubH = ansH + bubPad * 2;
+            UI.Place(bubble.rectTransform, pad, iy, iw, bubH);
+            iy += bubH + 8;
+
+            // Formal constraint
+            var formalBg = UI.Panel(root, "Formal", Theme.WithAlpha(Theme.Gold, 0.08f), 8, false);
+            float fh = Panels.Paragraph(formalBg.transform, st.Formal, Theme.Mono, 13, Theme.Gold, 10, 8, iw - 20);
+            UI.Place(formalBg.rectTransform, pad, iy, iw, fh + 16);
+            iy += fh + 24;
+
+            // Info chips
             string budgetChip = "−" + st.Cost + " pyetje · mbeten " + Mathf.Max(0, S.Remaining);
-            string elimChip = o.Changes.Count > 0 ? o.Changes.Count + " mundësi u përjashtuan në tabelë" : "Asnjë mundësi e re nuk u përjashtua";
-            float x = pad;
+            string elimChip = o.Changes.Count > 0 ? o.Changes.Count + "mundësi u përjashtuan" : "Asnjë ndërrim i ri";
+            float cx = pad;
             foreach (var chipText in new[] { budgetChip, elimChip })
             {
                 float cw = UI.TextWidth(chipText, Theme.Sans, 13) + 24;
-                var chip = UI.Card(root, "Chip", new Color(0, 0, 0, 0), Theme.Line2, 14);
-                UI.Place(chip.rectTransform, x, iy, cw, 28);
+                var chip = UI.Card(root, "Chip", new Color(0, 0, 0, 0.2f), Theme.Line, 14);
+                UI.Place(chip.rectTransform, cx, iy, cw, 28);
                 var t = UI.Label(chip.transform, chipText, Theme.Sans, 13, Theme.Text2, TextAnchor.MiddleCenter);
                 UI.Stretch(t.rectTransform, 0, 0, 0, 0);
                 t.horizontalOverflow = HorizontalWrapMode.Overflow;
-                x += cw + 8;
+                cx += cw + 8;
             }
             iy += 38;
+
             if (o.Duplicate)
             {
                 iy += Panels.Paragraph(root, "Kjo pyetje ishte bërë më parë dhe nuk solli informacion të ri.", Theme.Sans, 14, Theme.Hex("#E2C27A"), pad, iy, iw) + 6;
@@ -242,7 +259,7 @@ namespace Alibi.Unity
                 UI.Place(badge.rectTransform, 12, 12, 24, 24);
                 var ex = UI.Label(badge.transform, "!", Theme.SansBold, 16, Theme.Night, TextAnchor.MiddleCenter);
                 UI.Stretch(ex.rectTransform, 0, 0, 0, 0);
-                UI.LabelAt(box.transform, "Kontradiktë", Theme.SansBold, 15, Theme.RedText, 46, 12, iw - 60, 22);
+                UI.LabelAt(box.transform, "Kontradictë", Theme.SansBold, 15, Theme.RedText, 46, 12, iw - 60, 22);
                 float th = Panels.Paragraph(box.transform, S.ConflictText(o.Conflict), Theme.Sans, 14, Theme.Hex("#F1D6D0"), 46, 36, iw - 60);
                 float bh = 36 + th + 12;
                 UI.Place(box.rectTransform, pad, iy, iw, bh);

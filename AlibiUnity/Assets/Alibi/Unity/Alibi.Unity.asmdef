@@ -3,7 +3,8 @@
     "rootNamespace": "Alibi.Unity",
     "references": [
         "Alibi.Core",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

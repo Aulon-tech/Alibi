@@ -21,7 +21,7 @@ namespace Alibi.Unity
         float scale;
 
         public bool IsVisible { get { return State != MarkerState.Hidden || scale > 0.05f; } }
-        public Vector3 HeadPoint { get { return transform.position + Vector3.up * 1.18f * Mathf.Max(scale, 0.01f); } }
+        public Vector3 HeadPoint { get { return transform.position + Vector3.up * 1.2f * Mathf.Max(scale, 0.01f); } }
 
         public static SuspectMarker Create(Transform parent, VillaView view, int suspect, int room, Vector3 pos, Material lit, Material ghost, Material ringMat, Material conflictMat)
         {
@@ -77,7 +77,7 @@ namespace Alibi.Unity
             State = state;
             Conflict = conflict && state != MarkerState.Hidden;
             ApplyLook();
-            targetScale = state == MarkerState.Hidden ? 0f : state == MarkerState.Possible ? 0.94f : 1f;
+            targetScale = state == MarkerState.Hidden ? 0f : state == MarkerState.Possible ? 1.7f : 1.8f;
             if (targetScale > 0 && !gameObject.activeSelf) gameObject.SetActive(true);
         }
 
@@ -94,10 +94,9 @@ namespace Alibi.Unity
 
         void Update()
         {
-            float speed = targetScale > scale ? 5f : 3.2f;
+            float speed = targetScale > scale ? 8f : 5f;
             scale = Mathf.MoveTowards(scale, targetScale, Time.deltaTime * speed);
-            float eased = scale <= 0 ? 0 : Mathf.SmoothStep(0f, 1f, Mathf.Min(1f, scale));
-            transform.localScale = new Vector3(eased, eased, eased);
+            transform.localScale = Vector3.one * scale;
         }
 
         public void OnPointerClick(PointerEventData eventData)

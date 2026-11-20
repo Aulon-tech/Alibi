@@ -19,6 +19,19 @@ namespace Alibi.Unity
             if (on) b.Border.color = Theme.Gold;
         }
 
+        static string QIcon(QType t)
+        {
+            switch (t)
+            {
+                case QType.Q1: return "?";
+                case QType.Q2: return "=";
+                case QType.Q3: return "#";
+                case QType.Q4: return "!";
+                case QType.Q5: return "X";
+                default: return "~";
+            }
+        }
+
         public float Build(RectTransform content, float y, float w)
         {
             var s = gm.Session;
@@ -29,16 +42,40 @@ namespace Alibi.Unity
             var card = UI.Card(content, "Interrogation", Theme.Panel, Theme.Line, 14);
             var root = card.transform;
             float pad = 18, iw = w - pad * 2, iy = 14;
-            UI.LabelAt(root, "Marrja në pyetje", Theme.Serif, 30, Theme.Parchment, pad, iy, iw, 38);
-            var tag = UI.LabelAt(root, "Hyrje e strukturuar · D10", Theme.Sans, 13, Theme.Muted, pad, iy + 10, iw, 20, TextAnchor.UpperRight);
-            tag.horizontalOverflow = HorizontalWrapMode.Overflow;
-            iy += 48;
 
-            UI.SectionLabel(root, "1 · I DYSHUARI", pad, iy, iw);
-            iy += 24;
+            // Header with detective badge
+            var headerBg = UI.Card(root, "HeaderBg", Theme.Hex("#0D1017"), Theme.WithAlpha(Theme.Gold, 0.25f), 10);
+            UI.Place(headerBg.rectTransform, pad, iy, iw, 56);
+            var badge = UI.Panel(headerBg.transform, "Badge", Theme.WithAlpha(Theme.Gold, 0.15f), 20, false);
+            UI.Place(badge.rectTransform, 14, 12, 32, 32);
+            UI.Label(badge.transform, "✧", Theme.Serif, 20, Theme.Gold, TextAnchor.MiddleCenter);
+            UI.Stretch(((Text)badge.GetComponentInChildren<Text>()).rectTransform, 0, 0, 0, 0);
+            UI.LabelAt(headerBg.transform, "Dhoma e marrjes në pyetje", Theme.Serif, 24, Theme.Parchment, 56, 8, iw - 70, 28);
+            UI.LabelAt(headerBg.transform, "Zgjidh · pyet · zbulo", Theme.Sans, 12, Theme.Muted, 56, 34, iw - 70, 18);
+            iy += 68;
+
+            // ===== STEP 1: SUSPECT SELECTION =====
+            iy += StepHeader(root, "1", "ZGJIDH TE DYSHUARIN", pad, iy, iw);
+
+            if (q.Suspect >= 0)
+            {
+                // Show selected suspect prominently
+                var sus = c.Suspects[q.Suspect];
+                var selCard = UI.Card(root, "SelSuspect", Theme.Hex("#141924"), Theme.WithAlpha(Theme.Gold, 0.4f), 10);
+                UI.Place(selCard.rectTransform, pad, iy, iw, 64);
+                UI.Avatar(selCard.transform, sus, 42, 12, 11);
+                UI.LabelAt(selCard.transform, sus.Name, Theme.SansBold, 18, Theme.Text, 66, 8, iw - 160, 24);
+                bool cleared = s.IsCleared(q.Suspect);
+                UI.LabelAt(selCard.transform, sus.Role + " · " + (cleared ? "<color=#A9C3E6>jashtë dyshimit</color>" : "<color=#E2C27A>i dyshuar</color>"), Theme.Sans, 13, Theme.Muted, 66, 34, iw - 160, 20);
+                var change = UI.Button(selCard.transform, "Ndrysho", BtnStyle.Ghost, () => {}, 13, 6);
+                UI.PlaceRight(change.Rect, 12, 18, 80, 28);
+                iy += 72;
+            }
+
+            // Suspect grid
             int cols = c.N <= 4 ? 2 : 3;
-            float gap = 8;
-            float cw = (iw - gap * (cols - 1)) / cols, ch = 60;
+            float gap = 6;
+            float cw = (iw - gap * (cols - 1)) / cols, ch = 52;
             for (int i = 0; i < c.N; i++)
             {
                 int si = i;
@@ -48,17 +85,22 @@ namespace Alibi.Unity
                 UI.Place(b.Rect, pad + (i % cols) * (cw + gap), iy + (i / cols) * (ch + gap), cw, ch);
                 b.SetInteractable(!locked);
                 Hint(b, hint != null && hint.Suspect == i && !on);
-                UI.Avatar(b.Rect, sus, 36, 10, 12);
-                var name = UI.LabelAt(b.Rect, sus.Name, Theme.SansSemi, 16, Theme.Text, 56, 9, cw - 60, 22);
+                UI.Avatar(b.Rect, sus, 32, 8, 10);
+                var name = UI.LabelAt(b.Rect, sus.Name, Theme.SansSemi, 15, Theme.Text, 48, 6, cw - 54, 20);
                 name.horizontalOverflow = HorizontalWrapMode.Overflow;
                 bool cleared = s.IsCleared(i);
-                var st = UI.LabelAt(b.Rect, sus.Role + " · " + (cleared ? "<color=#A9C3E6>jashtë dyshimit</color>" : "<color=#E2C27A>kandidat</color>"), Theme.Sans, 12, Theme.Muted, 56, 31, cw - 60, 20);
+                var st = UI.LabelAt(b.Rect, cleared ? "i pastër" : "kandidat", Theme.Sans, 11, cleared ? Theme.Blue : Theme.Gold, 48, 27, cw - 54, 16);
                 st.horizontalOverflow = HorizontalWrapMode.Overflow;
             }
-            iy += Mathf.CeilToInt(c.N / (float)cols) * (ch + gap) + 6;
+            iy += Mathf.CeilToInt(c.N / (float)cols) * (ch + gap) + 8;
 
-            UI.SectionLabel(root, "2 · PYETJA", pad, iy, iw);
-            iy += 24;
+            // ===== STEP 2: QUESTION TYPE =====
+            iy += StepHeader(root, "2", "ZGJIDH PYETJEN", pad, iy, iw);
+
+            int qCols = 2;
+            float qGap = 8;
+            float qcw = (iw - qGap * (qCols - 1)) / qCols;
+            int qi = 0;
             foreach (var type in QuestionEngine.TypesFor(c))
             {
                 var qt = type;
@@ -66,65 +108,107 @@ namespace Alibi.Unity
                 int cost = QuestionEngine.Cost(type);
                 bool tooCostly = !locked && cost > s.Remaining;
                 var b = UI.Button(root, null, on ? BtnStyle.ChipOn : BtnStyle.Chip, () => gm.SelectType(qt), 16, 9);
-                UI.Place(b.Rect, pad, iy, iw, 46);
+                float qx = pad + (qi % qCols) * (qcw + qGap);
+                float qy = iy + (qi / qCols) * 76;
+                UI.Place(b.Rect, qx, qy, qcw, 70);
                 b.SetInteractable(!locked && !tooCostly);
                 Hint(b, hint != null && hint.HasType && hint.Type == type && !on);
-                var code = UI.Panel(b.Rect, "Code", Theme.Line, 5, false);
-                UI.Place(code.rectTransform, 10, 12, 34, 22);
-                var codeText = UI.Label(code.transform, QuestionEngine.Code(type), Theme.Mono, 13, Theme.Gold, TextAnchor.MiddleCenter);
-                UI.Stretch(codeText.rectTransform, 0, 0, 0, 0);
-                UI.LabelAt(b.Rect, QuestionEngine.GenericLabel(type), Theme.SansSemi, 15, Theme.Text, 54, 5, iw - 150, 22);
-                UI.LabelAt(b.Rect, tooCostly ? s.BudgetMessage(type) : QuestionEngine.Info(type), Theme.Sans, 12, tooCostly ? Theme.RedText : Theme.Muted, 54, 25, iw - 130, 18);
-                UI.LabelAt(b.Rect, cost == 1 ? "1 pyetje" : "2 pyetje", Theme.Mono, 13, Theme.Text2, iw - 96, 0, 86, 46, TextAnchor.MiddleRight);
-                iy += 52;
-            }
-            iy += 4;
 
-            UI.SectionLabel(root, "3 · PARAMETRI", pad, iy, iw);
-            iy += 26;
-            if (!q.HasType)
-            {
-                UI.LabelAt(root, "Zgjidh fillimisht një pyetje; parametri i panevojshëm fshihet sipas llojit.", Theme.Sans, 14, Theme.Muted, pad, iy, iw, 22);
-                iy += 30;
+                // Icon circle
+                var icon = UI.Panel(b.Rect, "Icon", on ? Theme.WithAlpha(Theme.Gold, 0.25f) : Theme.Line, 16, false);
+                UI.Place(icon.rectTransform, 10, 10, 32, 32);
+                UI.Label(icon.transform, QIcon(type), Theme.SansBold, 16, on ? Theme.Gold : Theme.Text2, TextAnchor.MiddleCenter);
+                UI.Stretch(((Text)icon.GetComponentInChildren<Text>()).rectTransform, 0, 0, 0, 0);
+
+                // Code label
+                UI.LabelAt(b.Rect, QuestionEngine.Code(type), Theme.Mono, 11, Theme.Gold, 48, 8, qcw - 100, 16);
+                // Question name
+                UI.LabelAt(b.Rect, QuestionEngine.GenericLabel(type), Theme.SansSemi, 14, tooCostly ? Theme.RedText : Theme.Text, 48, 24, qcw - 60, 20);
+                // Cost badge
+                var costBg = UI.Panel(b.Rect, "Cost", on ? Theme.WithAlpha(Theme.Gold, 0.2f) : new Color(0, 0, 0, 0.3f), 8, false);
+                UI.PlaceRight(costBg.rectTransform, 8, 8, 44, 22);
+                UI.Label(costBg.transform, "-" + cost, Theme.Mono, 13, cost == 2 ? Theme.Hex("#E2C27A") : Theme.Text2, TextAnchor.MiddleCenter);
+                UI.Stretch(((Text)costBg.GetComponentInChildren<Text>()).rectTransform, 0, 0, 0, 0);
+                // Info line
+                string info = tooCostly ? s.BudgetMessage(type) : QuestionEngine.Info(type);
+                UI.LabelAt(b.Rect, info, Theme.Sans, 11, tooCostly ? Theme.RedText : Theme.Muted, 48, 46, qcw - 60, 18);
+                qi++;
             }
-            else
+            iy += Mathf.CeilToInt(qi / (float)qCols) * 76 + 8;
+
+            // ===== STEP 3: PARAMETERS =====
+            if (q.HasType)
             {
-                if (QuestionEngine.NeedsOther(q.Type))
+                bool needsAny = QuestionEngine.NeedsOther(q.Type) || QuestionEngine.NeedsTime(q.Type) || QuestionEngine.NeedsRoom(q.Type);
+                if (needsAny)
                 {
-                    var items = new List<KeyValuePair<string, int>>();
-                    for (int i = 0; i < c.N; i++) if (i != q.Suspect) items.Add(new KeyValuePair<string, int>(c.Suspects[i].Name, i));
-                    iy = ChipRow(root, "Personi Y", items, q.Other, hint != null ? hint.Other : -1, v => gm.SelectOther(v), pad, iy, iw, locked);
+                    iy += StepHeader(root, "3", "PLOTËSO PARAMETRIN", pad, iy, iw);
+
+                    if (QuestionEngine.NeedsOther(q.Type))
+                    {
+                        var items = new List<KeyValuePair<string, int>>();
+                        for (int i = 0; i < c.N; i++) if (i != q.Suspect) items.Add(new KeyValuePair<string, int>(c.Suspects[i].Name, i));
+                        iy = ChipRow(root, "Personi Y", items, q.Other, hint != null ? hint.Other : -1, v => gm.SelectOther(v), pad, iy, iw, locked);
+                    }
+                    if (QuestionEngine.NeedsTime(q.Type))
+                    {
+                        var items = new List<KeyValuePair<string, int>>();
+                        for (int t = 0; t < c.T; t++) items.Add(new KeyValuePair<string, int>(c.Hours[t], t));
+                        iy = ChipRow(root, "Ora X", items, q.Time, hint != null ? hint.Time : -1, v => gm.SelectTime(v), pad, iy, iw, locked);
+                    }
+                    if (QuestionEngine.NeedsRoom(q.Type))
+                    {
+                        var items = new List<KeyValuePair<string, int>>();
+                        for (int r = 0; r < c.RoomCount; r++) items.Add(new KeyValuePair<string, int>(c.Rooms[r].Name, r));
+                        iy = ChipRow(root, "Dhoma R", items, q.Room, hint != null ? hint.Room : -1, v => gm.SelectRoomParam(v), pad, iy, iw, locked);
+                    }
                 }
-                if (QuestionEngine.NeedsTime(q.Type))
-                {
-                    var items = new List<KeyValuePair<string, int>>();
-                    for (int t = 0; t < c.T; t++) items.Add(new KeyValuePair<string, int>(c.Hours[t], t));
-                    iy = ChipRow(root, "Ora X", items, q.Time, hint != null ? hint.Time : -1, v => gm.SelectTime(v), pad, iy, iw, locked);
-                }
-                if (QuestionEngine.NeedsRoom(q.Type))
-                {
-                    var items = new List<KeyValuePair<string, int>>();
-                    for (int r = 0; r < c.RoomCount; r++) items.Add(new KeyValuePair<string, int>(c.Rooms[r].Name, r));
-                    iy = ChipRow(root, "Dhoma R", items, q.Room, hint != null ? hint.Room : -1, v => gm.SelectRoomParam(v), pad, iy, iw, locked);
-                }
+            }
+            else if (q.Suspect >= 0)
+            {
+                UI.LabelAt(root, "Zgjidh pyetjen për të parë parametrat.", Theme.Sans, 13, Theme.Muted, pad, iy, iw, 22);
+                iy += 28;
             }
 
-            var box = UI.Card(root, "Compose", Theme.Hex("#0F1218"), Theme.Line, 10);
-            var compose = UI.LabelAt(box.transform, gm.ComposeText(), Theme.Mono, 15, Theme.Parchment, 14, 12, iw - 28, 40);
-            float composeH = UI.FitHeight(compose, iw - 28);
+            // ===== COMPOSE & ASK =====
+            var box = UI.Card(root, "Compose", Theme.Hex("#0C0F15"), Theme.WithAlpha(Theme.Gold, 0.2f), 12);
+            float bpad = 14;
+
+            // Speech bubble indicator
+            var bubble = UI.Panel(box.transform, "Bubble", Theme.WithAlpha(Theme.Gold, 0.08f), 8, false);
+            UI.Place(bubble.rectTransform, bpad, bpad, iw - bpad * 2, 0); // height set below
+
+            var compose = UI.LabelAt(bubble.transform, gm.ComposeText(), Theme.SerifItalic, 16, Theme.Parchment, 12, 10, iw - bpad * 2 - 24, 40);
+            float composeH = UI.FitHeight(compose, iw - bpad * 2 - 24) + 20;
+            UI.Place(bubble.rectTransform, bpad, bpad, iw - bpad * 2, composeH);
+
             string message;
             bool ready = gm.CanAsk(out message);
-            var msg = UI.LabelAt(box.transform, message, Theme.Sans, 13, ready ? Theme.Muted : Theme.Hex("#E2C27A"), 14, 20 + composeH, iw - 210, 40);
-            float msgH = UI.FitHeight(msg, iw - 210);
+            float msgY = bpad + composeH + 8;
+            var msg = UI.LabelAt(box.transform, message, Theme.Sans, 13, ready ? Theme.Muted : Theme.Hex("#E2C27A"), bpad, msgY, iw - 200, 40);
+            float msgH = UI.FitHeight(msg, iw - 200);
+
+            float boxH = Mathf.Max(msgY + msgH + bpad, msgY + 52);
             var ask = UI.Button(box.transform, ready ? "Pyet · −" + QuestionEngine.Cost(q.Type) : "Pyet", ready ? BtnStyle.Primary : BtnStyle.Disabled, gm.Ask, 17, 10);
-            float boxH = Mathf.Max(20 + composeH + msgH + 14, 20 + composeH + 58);
-            UI.PlaceRight(ask.Rect, 14, boxH - 58, 160, 46);
+            UI.PlaceRight(ask.Rect, 14, boxH - 54, 150, 42);
             ask.SetInteractable(ready);
             UI.Place(box.rectTransform, pad, iy, iw, boxH);
             iy += boxH + 18;
 
             UI.Place(card.rectTransform, 0, y, w, iy);
             return iy;
+        }
+
+        float StepHeader(Transform root, string num, string label, float pad, float iy, float iw)
+        {
+            var numBg = UI.Panel(root, "StepNum", Theme.WithAlpha(Theme.Gold, 0.15f), 12, false);
+            UI.Place(numBg.rectTransform, pad, iy, 24, 24);
+            UI.Label(numBg.transform, num, Theme.Mono, 13, Theme.Gold, TextAnchor.MiddleCenter);
+            UI.Stretch(((Text)numBg.GetComponentInChildren<Text>()).rectTransform, 0, 0, 0, 0);
+            UI.LabelAt(root, label, Theme.Mono, 12, Theme.Muted, pad + 32, iy + 3, iw - 32, 18);
+            var line = UI.Panel(root, "StepLine", Theme.Line, 0, false);
+            UI.Place(line.rectTransform, pad + 32 + UI.TextWidth(label, Theme.Mono, 12) + 8, iy + 12, iw - 32 - UI.TextWidth(label, Theme.Mono, 12) - 8, 1);
+            return 32;
         }
 
         float ChipRow(Transform root, string label, List<KeyValuePair<string, int>> items, int selected, int hinted, System.Action<int> pick, float pad, float iy, float iw, bool locked)

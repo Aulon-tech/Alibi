@@ -35,13 +35,26 @@ namespace Alibi.Unity
             session = s;
             c = s.Case;
             villa = v;
-            var card = UI.Card(parent, "BoardCard", Theme.Panel, Theme.Line, 14);
+            var card = UI.Card(parent, "BoardCard", Theme.Hex("#0D1017"), Theme.WithAlpha(Theme.Gold, 0.2f), 14);
             UI.Stretch(card.rectTransform, 0, 0, 0, 0);
             var root = card.transform;
-            UI.LabelAt(root, "Tabela e deduksionit", Theme.Serif, 28, Theme.Parchment, 18, 8, 420, 36);
-            candidatesRow = UI.Rect(root, "Candidates");
-            UI.PlaceRight(candidatesRow, 16, 10, 420, 32);
-            candidatesText = UI.Label(candidatesRow, "", Theme.Sans, 15, Theme.Text2, TextAnchor.MiddleRight);
+
+            // Header bar
+            var headerBg = UI.Card(root, "HeaderBg", Theme.Hex("#0D1017"), Theme.WithAlpha(Theme.Gold, 0.25f), 10);
+            UI.Stretch(headerBg.rectTransform, 10, 4, 10, 0);
+            headerBg.rectTransform.anchorMin = new Vector2(0, 1);
+            headerBg.rectTransform.anchorMax = new Vector2(1, 1);
+            headerBg.rectTransform.pivot = new Vector2(0.5f, 1);
+            headerBg.rectTransform.offsetMin = new Vector2(10, -44);
+            headerBg.rectTransform.offsetMax = new Vector2(-10, -4);
+            var badge = UI.Panel(headerBg.transform, "Badge", Theme.WithAlpha(Theme.Gold, 0.15f), 14, false);
+            UI.Place(badge.rectTransform, 10, 8, 28, 28);
+            UI.Label(badge.transform, "✧", Theme.Serif, 16, Theme.Gold, TextAnchor.MiddleCenter);
+            UI.Stretch(((Text)badge.GetComponentInChildren<Text>()).rectTransform, 0, 0, 0, 0);
+            UI.LabelAt(headerBg.transform, "Tabela e deduksionit", Theme.Serif, 24, Theme.Parchment, 46, 4, 300, 36);
+            candidatesRow = UI.Rect(headerBg.transform, "Candidates");
+            UI.PlaceRight(candidatesRow, 12, 6, 420, 32);
+            candidatesText = UI.Label(candidatesRow, "", Theme.Sans, 14, Theme.Text2, TextAnchor.MiddleRight);
             UI.Stretch(candidatesText.rectTransform, 0, 0, 0, 0);
 
             var grid = UI.Rect(root, "Grid");
@@ -118,11 +131,16 @@ namespace Alibi.Unity
             }
 
             var legend = UI.Rect(root, "Legend");
-            UI.StretchBottom(legend, 18, 6, 18, 24);
+            UI.StretchBottom(legend, 14, 4, 14, 28);
+            var legendBg = legend.gameObject.AddComponent<Image>();
+            legendBg.sprite = Theme.Rounded(8);
+            legendBg.type = Image.Type.Sliced;
+            legendBg.color = Theme.WithAlpha(Theme.Gold, 0.05f);
+            legendBg.raycastTarget = false;
             var parts = new List<string>();
             foreach (var r in c.Rooms) parts.Add("<color=#ECE6D8>" + r.Id + "</color> " + r.Name);
-            var lt = UI.Label(legend, string.Join("   ", parts.ToArray()) + "      <color=#D2AD62>ari</color> = e konfirmuar · <color=#C9C2B2>kuti</color> = e mundshme · <color=#6E747D>zbehur</color> = e përjashtuar", Theme.Sans, 13, Theme.Muted, TextAnchor.MiddleLeft);
-            UI.Stretch(lt.rectTransform, 0, 0, 0, 0);
+            var lt = UI.Label(legend, string.Join("   ", parts.ToArray()) + "      <color=#D2AD62>◉</color> konfirmuar · <color=#C9C2B2>■</color> mundshme · <color=#6E747D>▫</color> përjashtuar", Theme.Sans, 12, Theme.Muted, TextAnchor.MiddleLeft);
+            UI.Stretch(lt.rectTransform, 10, 0, 10, 0);
             lt.horizontalOverflow = HorizontalWrapMode.Overflow;
 
             s.Domains.OnDomainChanged += HandleDomainChanged;

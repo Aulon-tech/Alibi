@@ -21,10 +21,21 @@ Menyja ka Vazhdo, Kartat e niveleve, Rast i ri, Si luhet dhe Dil. Kartat 1–4 j
 
 Ne loje: vila 3D me figurat (e plote = e konfirmuar, e tejdukshme = e mundshme, zhduket = e perjashtuar), slider-i i kohes, pyetjet Q1–Q5 me kosto, buxheti, tabela e deduksionit qe perditesohet vete (AC-3), dosja e deshmive, kontradikta e theksuar (D9), input i strukturuar (D10), akuza me person + dhome + ore, fitorja me yje dhe zinxhirin e kufizimeve, humbja me kufizimin qe e perjashtonte akuzen dhe pozicionet e verteta ne vile, "Provo perseri" me te njejtin seed (T11) dhe dalja pa akuze si ABANDONED (T10).
 
+## Shtepia e gjalle (3D)
+
+Karta 1 luhet ne 3D: detektivi ecen neper vile me tastiere dhe pyet te dyshuarit nga afer. Secili qendron ne dhomen e vet. Kartat e tjera luhen me pamjen e hartes.
+
+- WASD ose shigjetat: ec. Shift: vrap. Q / E: kthe kameren.
+- Afrohu dikujt: shfaqet emri, rrethi i arte ne dysheme dhe paneli i pyetjeve. 1–6 zgjedh pyetjen, Enter pyet.
+- Diamanti i arte mbi koke = ende nuk e ke pyetur.
+- K: kerko dhomen. F: kalimi i fshehte Biblioteka–Zyra (pasi e gjen). Tab: tabela e deduksionit.
+
+Figurat jane `SuspectFigure` (Aulon), dhomat dhe kostumet `HouseSpawns` / `HouseDressing` (Nysret), levizja `ExploreMode` + `PlayerController` (Dea). Skena `Unity/Scenes/SuspectFigureTest` teston vetem figurat: WASD leviz topin, L = shiko topin, T = fol.
+
 ## Struktura e kodit
 
 - `Core/` – Model, QuestionEngine, CspSolver (AC-3 + backtracking per cdo hipoteze fajtori, edhe me deshmitar qe gabon nje here), DomainMatrix, GameSession (gjendjet CASE_LOADED deri ABANDONED), CaseGenerator, LieSelector, ParPolicy, LevelCards.
-- `Unity/` – GameManager, MapBuilder, HouseDressing + HouseSpawns (mobilje, drita, detaje roli, një person për dhomë), RoomView, SuspectMarker, DeductionBoardView, PropagationAnimator, TimelineController, InterrogationPanel, CameraRig, MainMenuController dhe panelet e UI.
+- `Unity/` – GameManager, MapBuilder, HouseDressing + HouseSpawns (mobilje, drita, detaje roli, një person për dhomë), ExploreMode + PlayerController + ExploreInput (shtepia e gjalle), SuspectFigure (figura e animuar), RoomView, SuspectMarker, DeductionBoardView, PropagationAnimator, TimelineController, InterrogationPanel, CameraRig, MainMenuController dhe panelet e UI.
 - `Editor/` – AlibiSetup (krijon skenat, Build Settings dhe materialin per URP ose Built-in).
 - `Tests/` – EditMode: kartat 1–4 sipas zgjidhjes se dokumentuar (përfshi R06 / TC-10), TC-01 deri TC-10, yjet, unikesia e gjeneratorit dhe zbulimi i rastit me defekt.
 - `Resources/AlibiFonts/` – Inter, Cormorant Garamond dhe JetBrains Mono (licenca OFL).

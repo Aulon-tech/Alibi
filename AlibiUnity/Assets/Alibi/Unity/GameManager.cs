@@ -22,16 +22,19 @@ namespace Alibi.Unity
         ScreenLabels labels;
         PropagationAnimator animator;
         Canvas canvas;
-        RectTransform overlayRoot, rightContent, tabsRow, villaFrame, roomCardHost, hudHost, barHost;
+        RectTransform overlayRoot, rightContent, tabsRow, villaFrame, roomCardHost, hudHost, barHost, cameraControlsHost;
         ScrollRect rightScroll;
         DeductionBoardView board;
         TimelineController timeline;
         InterrogationPanel interrogation;
         GamePanels panels;
+        ProgressiveRules progressiveRules;
         int currentTime;
         int selectedRoom = -1;
         int tab;
         bool tutorialVisible;
+
+        public Transform CanvasTransform { get { return canvas != null ? canvas.transform : null; } }
 
         void Start()
         {
@@ -43,6 +46,11 @@ namespace Alibi.Unity
             BuildUI();
             StartSession(false);
             ShowBrief();
+        }
+
+        void Update()
+        {
+            if (progressiveRules != null) progressiveRules.Update();
         }
 
         void BuildWorld()
@@ -135,34 +143,46 @@ namespace Alibi.Unity
 
             interrogation = new InterrogationPanel(this);
             panels = new GamePanels(this);
+            progressiveRules = new ProgressiveRules(this);
         }
 
         void BuildCameraControls()
         {
+            if (cameraControlsHost != null) Object.Destroy(cameraControlsHost.gameObject);
             var host = UI.Rect(villaFrame, "CameraControls");
+            cameraControlsHost = host;
             host.anchorMin = host.anchorMax = new Vector2(0, 0);
             host.pivot = new Vector2(0, 0);
             host.anchoredPosition = new Vector2(14, 14);
-            host.sizeDelta = new Vector2(420, 40);
-            string[] labelsTxt = { "‹", "›", "+", "–", "Qendër" };
+            host.sizeDelta = new Vector2(560, 40);
+            bool fp = rig != null && rig.Mode == CameraMode.FirstPerson;
+            string fpLabel = fp ? "Pamje nga lart" : "Pamje e parë";
+            string[] labelsTxt = { "‹", "›", "+", "–", "Qendër", fpLabel };
             float x = 0;
             for (int i = 0; i < labelsTxt.Length; i++)
             {
                 int k = i;
-                float w = i == 4 ? 86 : 40;
-                var b = UI.Button(host, labelsTxt[i], BtnStyle.Ghost, () =>
+                float w = i == 4 ? 86 : i == 5 ? 130 : 40;
+                var b = UI.Button(host, labelsTxt[i], k == 5 && fp ? BtnStyle.ChipOn : BtnStyle.Ghost, () =>
                 {
                     if (k == 0) rig.RotateStep(-1);
                     else if (k == 1) rig.RotateStep(1);
                     else if (k == 2) rig.ZoomBy(1.15f);
                     else if (k == 3) rig.ZoomBy(1f / 1.15f);
-                    else rig.ResetView();
-                }, i == 4 ? 14 : 20, 8);
+                    else if (k == 4) { rig.ResetView(); BuildCameraControls(); }
+                    else
+                    {
+                        if (rig.Mode == CameraMode.FirstPerson) rig.ExitFirstPerson();
+                        else rig.SetMode(CameraMode.FirstPerson);
+                        BuildCameraControls();
+                    }
+                }, k == 5 ? 14 : (k == 4 ? 14 : 20), 8);
                 b.Background.color = new Color(0.05f, 0.06f, 0.08f, 0.8f);
                 UI.Place(b.Rect, x, 0, w, 40);
                 x += w + 6;
             }
-            var hint = UI.LabelAt(host, "Kliko një dhomë ose një figurë · rrota e miut zmadhon", Theme.Sans, 12, Theme.Muted, x + 6, 0, 360, 40, TextAnchor.MiddleLeft);
+            string hint1 = fp ? "WASD lëviz · miu kthehet · Space/Shift lart/poshtë" : "Kliko një dhomë ose një figurë · rrota e miut zmadhon";
+            var hint = UI.LabelAt(host, hint1, Theme.Sans, 12, Theme.Muted, x + 6, 0, 420, 40, TextAnchor.MiddleLeft);
             hint.horizontalOverflow = HorizontalWrapMode.Overflow;
         }
 
@@ -575,6 +595,7 @@ namespace Alibi.Unity
             BuildTabs();
             RebuildRight(true);
             BuildRoomCard();
+            progressiveRules.OnQuestionAsked(outcome);
             if (outcome.Conflict != null) Panels.Toast(canvas.transform, "Kontradiktë: disa deklarata nuk mund të jenë të gjitha të vërteta.", Theme.Red, 3f);
             if (outcome.BudgetExhausted)
             {
@@ -615,7 +636,19 @@ namespace Alibi.Unity
 
         void ShowBrief()
         {
-            ShowOverlay(1);
+            if (IntroVideo.ShouldShow() && caseDef.CardNumber <= 1)
+            {
+                var iv = gameObject.AddComponent<IntroVideo>();
+                iv.Play(canvas.transform, caseDef, () =>
+                {
+                    if (iv != null) Destroy(iv);
+                    ShowOverlay(1);
+                });
+            }
+            else
+            {
+                ShowOverlay(1);
+            }
         }
 
         void ShowHowTo()

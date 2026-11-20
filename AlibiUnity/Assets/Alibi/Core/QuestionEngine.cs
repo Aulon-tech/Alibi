@@ -63,12 +63,12 @@ namespace Alibi.Core
         {
             switch (t)
             {
-                case QType.Q1: return "Një kufizim mbi një interval.";
-                case QType.Q2: return "Kufizim mbi të gjitha intervalet njëherësh.";
-                case QType.Q3: return "Lidh dy persona në një interval.";
-                case QType.Q4: return "Lidh një person me të gjithë të tjerët në atë interval.";
-                case QType.Q6: return "Vetëm te vjedhja: kufizim mbi pozicionin e sendit.";
-                default: return "Lidh dy intervale dhe përdor grafin e lëvizjes.";
+                case QType.Q1: return "Tregon ku ishte ai në një orë.";
+                case QType.Q2: return "Tregon nëse ka qenë ndonjëherë në atë dhomë.";
+                case QType.Q3: return "Tregon nëse e ka parë një person tjetër në atë orë.";
+                case QType.Q4: return "Tregon kush ishte me të në atë orë.";
+                case QType.Q6: return "Vetëm te vjedhja: tregon nëse ishte pranë sendit në atë orë.";
+                default: return "Tregon nga erdhi para se të hynte në atë dhomë.";
             }
         }
 
