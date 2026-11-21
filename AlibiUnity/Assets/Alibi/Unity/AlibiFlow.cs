@@ -36,13 +36,6 @@ namespace Alibi.Unity
         public static CaseDefinition PendingCase;
         public static string MenuNote;
         public static bool TutorialEnabled = true;
-        public static bool ExploreMode;
-
-        // Karta 1 luhet gjithmone ne 3D: detektivi ecen neper vile dhe pyet nga afer.
-        public static bool WalksIn(CaseDefinition c)
-        {
-            return c != null && c.CardNumber == 1;
-        }
 
         public static void StartCase(CaseDefinition c)
         {
@@ -102,13 +95,13 @@ namespace Alibi.Unity
 
         public static int NextCard()
         {
-            for (int k = 1; k <= 4; k++) if (!CardWon(k) && CardUnlocked(k)) return k;
-            return 4;
+            for (int k = 1; k <= 3; k++) if (!CardWon(k) && CardUnlocked(k)) return k;
+            return 3;
         }
 
         public static void ResetProgress()
         {
-            for (int k = 1; k <= 4; k++)
+            for (int k = 1; k <= 3; k++)
             {
                 PlayerPrefs.DeleteKey("alibi_card_" + k + "_won");
                 PlayerPrefs.DeleteKey("alibi_card_" + k + "_stars");

@@ -310,12 +310,13 @@ namespace Alibi.Unity
                 "Kartat e niveleve",
                 "Rast i ri",
                 "Si luhet",
+                "Profili",
                 "Dil"
             };
 
             float top = 0.63f;
-            float h   = 0.092f;    // shume me e larte
-            float gap = 0.018f;
+            float h   = 0.078f;    // pak me e vogel per 6 butona
+            float gap = 0.014f;
 
             for (int i = 0; i < labels.Length; i++)
             {
@@ -452,17 +453,18 @@ namespace Alibi.Unity
             hdrTxt.color     = Theme.Gold;
             hdrTxt.alignment = TextAnchor.MiddleCenter;
 
-            // 4 karta ne rresht — me te mdhaja, me kornize ari
-            float cardW   = 0.18f;
+            // 5 karta ne rresht — pak me te vogla per te nxane te pesta
+            float cardW   = 0.15f;
             float cardH   = 0.42f;
-            float totalW  = cardW * 4 + 0.03f * 3;
+            float gap     = 0.025f;
+            float totalW  = cardW * 5 + gap * 4;
             float startX  = 0.5f - totalW * 0.5f + cardW * 0.5f;
 
-            string[] names = { "Karta 1", "Karta 2", "Karta 3", "Karta 4" };
+            string[] names = { "Karta 1", "Karta 2", "Karta 3", "Karta 4", "Karta 5" };
 
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 5; i++)
             {
-                float cx = startX + i * (cardW + 0.03f);
+                float cx = startX + i * (cardW + gap);
                 BuildLevelCard(bgR, cx, 0.44f, cardW, cardH, names[i], i + 1);
             }
 
@@ -586,7 +588,7 @@ namespace Alibi.Unity
         void StartNewCase()
         {
             PlayerPrefs.SetInt("alibi_newcase", 1);
-            int level = Mathf.Clamp(AlibiFlow.NextCard(), 1, 4);
+            int level = Mathf.Clamp(AlibiFlow.NextCard(), 1, 5);
             var spec = LevelCards.Spec(level);
             var type = spec.Types != null && spec.Types.Length > 0 ? spec.Types[0] : CaseType.Vrasja;
             var result = CaseGenerator.Generate(level, type, Random.Range(1, 999999));
@@ -609,6 +611,23 @@ namespace Alibi.Unity
         {
             PlayerPrefs.SetInt("alibi_card", card);
             PlayerPrefs.DeleteKey("alibi_newcase");
+
+            // Nese karta ka rregulla te reja dhe nuk eshte pare ende, trego tutorialin
+            string tutKey = "alibi_card_tut_" + card;
+            if (card >= 2 && PlayerPrefs.GetInt(tutKey, 0) == 0)
+            {
+                PlayerPrefs.SetInt(tutKey, 1);
+                PlayerPrefs.Save();
+                var tutGo = new GameObject("_CardTutorial");
+                tutGo.transform.SetParent(_canvas.transform, false);
+                var tut = tutGo.AddComponent<TutorialSystem>();
+                tut.Show(_canvas.transform, card, () =>
+                {
+                    AlibiFlow.StartCase(LevelCards.Card(card));
+                });
+                return;
+            }
+
             AlibiFlow.StartCase(LevelCards.Card(card));
         }
 
@@ -624,7 +643,8 @@ namespace Alibi.Unity
                 case 1: ShowLevelSelect(); break;
                 case 2: StartNewCase(); break;
                 case 3: ShowIntro(); break;
-                case 4:
+                case 4: ShowProfile(); break;
+                case 5:
                     Application.Quit();
 #if UNITY_EDITOR
                     UnityEditor.EditorApplication.isPlaying = false;
@@ -635,9 +655,19 @@ namespace Alibi.Unity
 
         void ShowIntro()
         {
-            var introGo = new GameObject("_IntroReplay");
-            introGo.transform.SetParent(_canvas.transform, false);
-            introGo.AddComponent<IntroVideo>();
+            // "Si luhet" — hap tutorialin interaktiv (tutorial i plote, card=0)
+            var tutGo = new GameObject("_Tutorial");
+            tutGo.transform.SetParent(_canvas.transform, false);
+            var tut = tutGo.AddComponent<TutorialSystem>();
+            tut.Show(_canvas.transform, 0, () => { });
+        }
+
+        void ShowProfile()
+        {
+            var go = new GameObject("_ProgressPanel");
+            go.transform.SetParent(_canvas.transform, false);
+            var panel = go.AddComponent<ProgressPanel>();
+            panel.Show(_canvas.transform, () => { });
         }
 
         // ==============================================================

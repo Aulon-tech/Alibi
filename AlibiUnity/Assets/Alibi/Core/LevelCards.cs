@@ -136,7 +136,7 @@ namespace Alibi.Core
             new LevelSpec { Level = 2, Name = "Lëvizja", SuspectIds = new[] { "A", "B", "D", "E", "F" }, RoomIds = RoomsL2, Hours = HoursL2, Budget = 12, UseGraph = true, Types = new[] { CaseType.Vrasja }, Unlocks = "Grafi i lëvizjes: askush nuk zhvendoset pa kaluar nëpër dhomat ndërmjetëse.", Playable = true },
             new LevelSpec { Level = 3, Name = "Sabotimi", SuspectIds = new[] { "A", "B", "D", "E", "F" }, RoomIds = RoomsL2, Hours = HoursL3, Budget = 11, UseGraph = true, Types = new[] { CaseType.Sabotimi }, Unlocks = "Dëshmitari me gabim (Karta 3) dhe Sabotimi: ora e krimit nuk dihet.", Playable = true },
             new LevelSpec { Level = 4, Name = "Kalimi", SuspectIds = new[] { "A", "B", "D", "E", "F", "G" }, RoomIds = RoomsL4, Hours = HoursL4, Budget = 12, UseGraph = true, Types = new[] { CaseType.Vjedhja }, Unlocks = "Vjedhja: dosja lëviz me hajnin, pyetja për dosjen, «Kërko dhomën» dhe kalimi i fshehtë Biblioteka–Zyra.", Playable = true },
-            new LevelSpec { Level = 5, Name = "Fajtori", Unlocks = "Të tria llojet e krimit së bashku.", Playable = false, Budget = 9 },
+            new LevelSpec { Level = 5, Name = "Fajtori", SuspectIds = new[] { "A", "B", "D", "E", "F", "G" }, RoomIds = RoomsL4, Hours = HoursL4, Budget = 9, UseGraph = true, Types = new[] { CaseType.Vrasja, CaseType.Sabotimi, CaseType.Vjedhja }, Unlocks = "Të tria llojet e krimit së bashku: 6 të dyshuar, 9 dhoma, dëshmitar gabimi dhe kalim i fshehtë me buxhet të ngushtë.", Playable = true },
             new LevelSpec { Level = 6, Name = "I pafund", Unlocks = "Lloj dhe hartë të rastësishme.", Playable = false }
         };
 
@@ -172,6 +172,7 @@ namespace Alibi.Core
                 case 2: return Card2();
                 case 3: return Card3();
                 case 4: return Card4();
+                case 5: return Card5();
                 default: return Card1();
             }
         }
@@ -355,6 +356,117 @@ namespace Alibi.Core
             c.Rules.Add("Para vjedhjes dosja është në Zyrë. Pas vjedhjes, ajo është gjithmonë me hajnin.");
             c.Rules.Add("Pyetja «A e ke parë dosjen?» kushton 1 pikë: tregon nëse dikush ishte në të njëjtën dhomë me dosjen.");
             c.Rules.Add("Butoni «Kërko» (1 pikë) kontrollon një dhomë. Mund të gjesh një kalim të fshehtë Biblioteka–Zyra.");
+            c.Prepare();
+            return c;
+        }
+
+        // ── Karta 5 — Fajtori ──────────────────────────────────────────────
+        // Te tria mekanizmat se bashku: grafi i levizjes, deshmitar gabimi,
+        // kalimi i fshehte BI–ZY, indice fizike, 6 te dyshuar, 9 dhoma,
+        // buxhet i ngushte (9 pike). Rasti me i veshtire i fiksuar.
+        //
+        // Krimi: Vrasja ne Bodrum ne 23:00
+        // Fajtori: Blerimi (B) — shoferi
+        // Gabimi: Fatmiri thote gabim per oren 21:00
+        //
+        // Tabela e vertetes (dhoma per ore):
+        //   20:00  21:00  22:00  23:00  00:00
+        // A: KU     HO     SA     DN     KU      (kuzhine–holli–sallon–ngrenie–kuzhine)
+        // B: SA     HO     SH     BO     SH      (salon–holli–shkallet–bodrum–shkallet) ← FAJTORI
+        // D: ZY     KO     SH     HO     HO      (zyra–korridor–shkallet–holli–holli)
+        // E: BI     SA     SA     HO     SA      (biblioteka–sallon–sallon–holli–sallon)
+        // F: DN     DN     KU     KU     DN      (ngrenie–ngrenie–kuzhine–kuzhine–ngrenie) — GABON ne 21:00
+        // G: KO     ZY     ZY     KO     KO      (korridor–zyra–zyra–korridor–korridor)
+        //
+        // Mbulesa e Blerimit: SA → SA → SA → SA → SA
+        public static CaseDefinition Card5()
+        {
+            var c = new CaseDefinition
+            {
+                Id = "karta5",
+                CardNumber = 5,
+                Level = 5,
+                Seed = 505,
+                Title = "Karta 5 — Fajtori",
+                Kicker = "SFIDA FINALE · NIVELI 5",
+                Objective = "Gjej fajtorin me buxhetin më të ngushtë deri tani. Çdo pyetje duhet të numërojë — gabime nuk lejohen.",
+                Premise = "Gardiani i natës u gjet i vdekur në Bodrum, në 23:00. Vila ishte e mbyllur nga brenda — askush nuk hyri, askush nuk doli. Fajtori është mes gjashtë personave që ishin brenda.",
+                Hours = HoursL4,
+                Budget = 9,
+                Par = 7,
+                Type = CaseType.Vrasja,
+                ErrorsAllowed = 1
+            };
+
+            // 9 dhoma, 6 te dyshuar, grafi i levizjes
+            Villa.ApplyRooms(c, RoomsL4, true);
+            Villa.ApplySuspects(c, new[] { "A", "B", "D", "E", "F", "G" });
+
+            // Kalimi i fshehte Biblioteka–Zyra (si ne Karten 4)
+            Villa.SetSecretEdge(c, "BI", "ZY");
+
+            // Vrasja ne Bodrum (BO) ne 23:00 (indeksi 3)
+            c.CrimeRoom = c.RoomIndex("BO");
+            c.CrimeTime = 3;
+            c.Culprit = c.SuspectIndex("B");
+
+            // Tabela e vertetes — cdo levizje respekton grafin e fqinjeve
+            // Fqinjet: HO–SA, HO–KU, HO–SH, SA–BI, SA–DN, KU–DN, SH–KO, KO–ZY, SH–BO
+            c.Truth = new[]
+            {
+                //         20:00   21:00   22:00   23:00   00:00
+                Villa.Path(c, "KU", "HO", "SA", "DN", "KU"),     // A — Arta: KU→HO→SA→DN→KU
+                Villa.Path(c, "SA", "HO", "SH", "BO", "SH"),     // B — Blerimi (fajtori): SA→HO→SH→BO→SH
+                Villa.Path(c, "ZY", "KO", "SH", "HO", "HO"),     // D — Drita: ZY→KO→SH→HO→HO
+                Villa.Path(c, "BI", "SA", "SA", "HO", "SA"),      // E — Elmazi: BI→SA→SA→HO→SA
+                Villa.Path(c, "DN", "DN", "KU", "KU", "DN"),      // F — Fatmiri: DN→DN→KU→KU→DN (gabon 21:00)
+                Villa.Path(c, "KO", "ZY", "ZY", "KO", "KO")      // G — Genta: KO→ZY→ZY→KO→KO
+            };
+
+            // Mbulesa e fajtorit — Blerimi pretendon se ishte ne Sallon gjate gjithe mbrëmjes
+            c.Cover = Villa.Path(c, "SA", "SA", "SA", "SA", "SA");
+
+            // Deshmitari me gabim — Fatmiri (F) gabon per Q1 ne 21:00:
+            // Thote se ishte ne Sallon (SA), ne fakt ishte ne Dhomën e ngrënies (DN)
+            c.Mistakes.Add(new MistakeSpec
+            {
+                Suspect = c.SuspectIndex("F"),
+                Type = QType.Q1,
+                Time = 1,
+                WrongRoom = c.RoomIndex("SA")
+            });
+
+            // Indice fizike ne Biblioteke — zbulimi i kalimit te fshehte
+            c.PhysicalClues.Add(new PhysicalClue
+            {
+                Room = c.RoomIndex("BI"),
+                Title = "Rafti i lëvizur",
+                Text = "Librat në raftin e fundme janë rrëzuar. Pas tyre duket i njëjti kalim i ngushtë: Biblioteka lidhet me Zyrën e katit të parë.",
+                RevealsSecret = true
+            });
+
+            // Indice fizike ne Bodrum — gjurme ne vend te krimit
+            c.PhysicalClues.Add(new PhysicalClue
+            {
+                Room = c.RoomIndex("BO"),
+                Title = "Gjurme balte",
+                Text = "Në dyshemenë e Bodrumit ka gjurmë këpucësh me baltë. Gardiani kishte këpucë të pastra — dikush tjetër ka zbritur këtu.",
+                RevealsSecret = false
+            });
+
+            // Indice fizike ne Shkallet — detyron lojtarin te vizitoje
+            c.PhysicalClues.Add(new PhysicalClue
+            {
+                Room = c.RoomIndex("SH"),
+                Title = "Çelësi i hedhur",
+                Text = "Në shkallë, pranë murit, gjendet çelësi i Bodrumit. Dikush e ka lënë me nxitim duke u larguar.",
+                RevealsSecret = false
+            });
+
+            BaseRules(c);
+            c.Rules.Add("Në çdo orë, secili mund të shkojë vetëm në një dhomë fqinje. Dhomat fqinje: " + Villa.EdgeList(c) + ".");
+            c.Rules.Add("Kujdes: një dëshmitar i ndershëm gabon një herë pa dashje. Një kontradiktë e vetme nuk mjafton për ta fajësuar.");
+            c.Rules.Add("Butoni «Kërko» (1 pikë) kontrollon një dhomë për indice fizike.");
             c.Prepare();
             return c;
         }

@@ -439,13 +439,6 @@ namespace Alibi.Unity
             else truth.Append("Po ta pyesje, do të thoshte: «").Append(QuestionEngine.Answer(C, Question.Make(C.Culprit, QType.Q1, C.CrimeTime)).Text).Append("»");
             foreach (var st in S.Statements) if (st.IsMistake) truth.Append("\nGabimi i dëshmitarit të ndershëm (R05): ").Append(StatementLine(st));
             iy += Panels.Paragraph(root, truth.ToString(), Theme.Sans, 15, Theme.ParchInk, pad, iy, iw) + 6;
-            var story = CaseStory.For(C);
-            if (won && story != null && !string.IsNullOrEmpty(story.Epilogue))
-            {
-                UI.LabelAt(root, "MBYLLJA E RASTIT", Theme.Mono, 12, Theme.ParchMuted, pad, iy + 4, iw, 16);
-                iy += 24;
-                iy += Panels.Paragraph(root, story.Epilogue, Theme.SerifItalic, 19, Theme.ParchInk, pad, iy, iw) + 8;
-            }
             iy += Panels.Paragraph(root, "Pozicionet e vërteta janë tani në vilë. Lëviz kohën për t'i parë orë pas ore. 3 yje deri në par+1 · 2 yje deri në par+3 · 1 yll më shumë.", Theme.Sans, 13, Theme.ParchMuted, pad, iy, iw) + 12;
             var retry = UI.Button(root, "Provo përsëri · seed " + C.Seed, BtnStyle.Parchment, gm.Restart, 16, 10);
             UI.Place(retry.Rect, pad, iy, 250, 48);
@@ -500,21 +493,12 @@ namespace Alibi.Unity
                 UI.LabelAt(box.transform, C.Suspects[i].Role, Theme.Sans, 13, Theme.ParchMuted, 54, 31, sw - 58, 20);
             }
             iy += 72;
-            if (C.GeneratorNotes.Count > 0)
-            {
-                string note = "Gjeneratori refuzoi " + C.GeneratorNotes.Count + " seed-e me defekt para se ta hapte këtë rast (p.sh. " + C.GeneratorNotes[0] + "). Ky rast ka një defekt dhe nuk llogaritet si humbje: rastet e tilla nuk i shfaqen lojtarit, sistemi hap vetë seed-in tjetër.";
-                iy += Panels.Paragraph(root, note, Theme.Sans, 13, Theme.Hex("#7A5A22"), pad, iy, iw) + 6;
-            }
+            // Shenim gjeneratori hequr — nuk i intereson lojtarit
             iy += 10;
             var enter = UI.Button(root, "Hyr në vilë", BtnStyle.Parchment, gm.EnterCase, 18, 10);
             UI.Place(enter.Rect, pad, iy, 200, 52);
             var back = UI.Button(root, "Kthehu te menyja", BtnStyle.ParchmentGhost, gm.ExitToMenu, 16, 10);
             UI.Place(back.Rect, pad + 212, iy, 200, 52);
-            if (gm.HasStory)
-            {
-                var story = UI.Button(root, "Rrëfimi ▸", BtnStyle.ParchmentGhost, gm.PlayStory, 16, 10);
-                UI.Place(story.Rect, pad + 424, iy, 160, 52);
-            }
             iy += 52 + 34;
             Panels.Center(card.rectTransform, w, iy);
             float maxH = 1040;

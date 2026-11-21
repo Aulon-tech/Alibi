@@ -116,11 +116,6 @@ namespace Alibi.Unity
                 tab = 0;
                 InteractWithSuspect(s);
             };
-            villa.SecretPassageUsed = up =>
-            {
-                if (canvas == null) return;
-                Panels.Toast(canvas.transform, up ? "Kalove nga kalimi i fshehtë: tani je në Zyrë." : "Kalove nga kalimi i fshehtë: tani je në Bibliotekë.", Theme.Gold, 2.5f);
-            };
             AlibiFlow.DisableForeignCamerasAndLights(transform);
             animator = gameObject.AddComponent<PropagationAnimator>();
 
@@ -226,10 +221,13 @@ namespace Alibi.Unity
             // === DEDUCTION PANEL (toggled with Tab, left side overlay) ===
             deductionPanel = UI.Rect(root, "DeductionPanel");
             deductionPanel.anchorMin = Vector2.zero;
-            deductionPanel.anchorMax = new Vector2(0.55f, 1f);
+            deductionPanel.anchorMax = new Vector2(1f, 1f); // mbulon te gjithe harten
             deductionPanel.offsetMin = new Vector2(16, 16);
             deductionPanel.offsetMax = new Vector2(-16, -(BarH + 12));
             deductionPanel.gameObject.SetActive(false);
+            // Sfond i erret per te mbuluar harten kur hapet deduksioni
+            var dedBg = deductionPanel.gameObject.AddComponent<Image>();
+            dedBg.color = new Color(0.04f, 0.05f, 0.07f, 0.95f);
 
             float boardH = DeductionBoardView.PreferredHeight(caseDef);
             var boardRt = UI.Rect(deductionPanel, "Board");
@@ -413,7 +411,6 @@ namespace Alibi.Unity
             float zMin = float.MaxValue, zMax = float.MinValue;
             foreach (var l in MapBuilder.Layouts)
             {
-                if (caseDef.RoomIndex(l.Id) < 0) continue;
                 if (l.X0 < wMin) wMin = l.X0;
                 if (l.X1 > wMax) wMax = l.X1;
                 if (l.Z0 < zMin) zMin = l.Z0;
@@ -426,10 +423,9 @@ namespace Alibi.Unity
             float drawH = mapH - pad * 2;
             float scale = Mathf.Min(drawW / worldW, drawH / worldD);
 
-            // Draw each room as an outlined rectangle (vetëm dhomat e kësaj karte)
+            // Draw each room as an outlined rectangle
             foreach (var l in MapBuilder.Layouts)
             {
-                if (caseDef.RoomIndex(l.Id) < 0) continue;
                 float rx = pad + (l.X0 - wMin) * scale;
                 float ry = pad + (l.Z0 - zMin) * scale;
                 float rw = (l.X1 - l.X0) * scale;
@@ -477,7 +473,6 @@ namespace Alibi.Unity
                     if (l.Id == d.B) { b = l; fb = true; }
                 }
                 if (!fa || !fb) continue;
-                if (caseDef.RoomIndex(d.A) < 0 || caseDef.RoomIndex(d.B) < 0) continue;
 
                 // Calculate center of each room on minimap
                 float ax = pad + ((a.X0 + a.X1) * 0.5f - wMin) * scale;
@@ -536,7 +531,6 @@ namespace Alibi.Unity
             float zMin = float.MaxValue, zMax = float.MinValue;
             foreach (var l in MapBuilder.Layouts)
             {
-                if (caseDef.RoomIndex(l.Id) < 0) continue;
                 if (l.X0 < wMin) wMin = l.X0;
                 if (l.X1 > wMax) wMax = l.X1;
                 if (l.Z0 < zMin) zMin = l.Z0;
@@ -576,12 +570,6 @@ namespace Alibi.Unity
             {
                 if (res == null || !res.gameObject.activeInHierarchy) continue;
                 if (res.Visual != null && !res.Visual.activeSelf) continue;
-                // vetëm në të njëjtin kat (p.sh. jo dikush në Zyrë kur lojtari është në Bibliotekë poshtë)
-                if (Mathf.Abs(res.transform.position.y - (playerPos.y - rig.EyeHeight)) > 2f)
-                {
-                    if (res.NameLabel != null && res.NameLabel.activeSelf) res.NameLabel.SetActive(false);
-                    continue;
-                }
                 float dist = Vector3.Distance(playerPos, res.transform.position);
 
                 // Show/hide name label based on proximity
@@ -762,9 +750,7 @@ namespace Alibi.Unity
         {
             UI.Clear(hudHost);
             var chip = UI.Card(hudHost, "HudTitle", new Color(0.05f, 0.06f, 0.08f, 0.85f), Theme.Line, 10);
-            string title = Truth ? "E VËRTETA E ZBULUAR"
-                : caseDef.RoomIndex("BO") >= 0 ? "VILA · PËRDHESA, KATI I PARË DHE BODRUMI"
-                : caseDef.Level >= 2 ? "VILA · PËRDHESA DHE KATI I PARË" : "VILA · PËRDHESA";
+            string title = Truth ? "E VËRTETA E ZBULUAR" : (caseDef.Level >= 2 ? "VILA · PËRDHESA DHE KATI I PARË" : "VILA · PËRDHESA");
             string sub = Truth ? "Pozicionet reale në " + caseDef.Hours[currentTime] : "Çfarë dihet për " + caseDef.Hours[currentTime];
             float w = Mathf.Max(UI.TextWidth(title, Theme.Mono, 13), UI.TextWidth(sub, Theme.Sans, 14)) + 30;
             UI.Place(chip.rectTransform, 14, BarH + 14, w, 58);
@@ -780,15 +766,13 @@ namespace Alibi.Unity
             UI.Stretch(pt.rectTransform, 0, 0, 0, 0);
             pt.horizontalOverflow = HorizontalWrapMode.Overflow;
 
-            // Tab hint
-            string tabHint = showDeduction ? "[Tab] Fshih deduksionin" : "[Tab] Hap deduksionin";
-            var th = UI.Card(hudHost, "TabHint", new Color(0.05f, 0.06f, 0.08f, 0.7f), Theme.Line, 8);
-            float thw = UI.TextWidth(tabHint, Theme.Mono, 12) + 24;
-            th.rectTransform.anchorMin = th.rectTransform.anchorMax = new Vector2(0, 0);
-            th.rectTransform.pivot = new Vector2(0, 0);
-            th.rectTransform.anchoredPosition = new Vector2(14, 60);
-            th.rectTransform.sizeDelta = new Vector2(thw, 28);
-            UI.Label(th.transform, tabHint, Theme.Mono, 12, Theme.Muted, TextAnchor.MiddleCenter);
+            // Butoni per deduksion (zevendeson Tab hint tekstin)
+            string tabLabel = showDeduction ? "Fshih deduksionin" : "Hap deduksionin";
+            var tabBtn = UI.Button(hudHost, tabLabel, BtnStyle.Dark, () => { ToggleDeduction(); BuildHud(); }, 14, 8);
+            tabBtn.Rect.anchorMin = tabBtn.Rect.anchorMax = new Vector2(0, 0);
+            tabBtn.Rect.pivot = new Vector2(0, 0);
+            tabBtn.Rect.anchoredPosition = new Vector2(14, 60);
+            tabBtn.Rect.sizeDelta = new Vector2(180, 34);
         }
 
         void BuildRoomCard()
@@ -799,8 +783,7 @@ namespace Alibi.Unity
             float iy = 12;
             if (selectedRoom < 0)
             {
-                var t = UI.LabelAt(root, "Kliko një dhomë për të parë kush mund të ketë qenë aty në orën e zgjedhur. Afërohu një figure për ta marrë në pyetje.", Theme.Sans, 13, Theme.Text2, 14, iy, 272, 20);
-                iy += UI.FitHeight(t, 272) + 12;
+                // (Hequr — pa tekst hint kur nuk eshte zgjedhur dhome)
             }
             else
             {
@@ -1149,30 +1132,10 @@ namespace Alibi.Unity
                     ShowOverlay(1);
                 });
             }
-            else if (CaseStory.ShouldShow(caseDef))
-            {
-                PlayStory();
-            }
             else
             {
                 ShowOverlay(1);
             }
-        }
-
-        public bool HasStory { get { return CaseStory.For(caseDef) != null; } }
-
-        // Rrëfimi i kartës (Karta 3, Karta 4); pas tij kthehet te përmbledhja e rastit.
-        public void PlayStory()
-        {
-            var story = CaseStory.For(caseDef);
-            if (story == null) { ShowOverlay(1); return; }
-            CloseOverlay();
-            var iv = gameObject.AddComponent<IntroVideo>();
-            iv.PlayStory(canvas.transform, caseDef, story, () =>
-            {
-                if (iv != null) Destroy(iv);
-                ShowOverlay(1);
-            });
         }
 
         void ShowHowTo()
