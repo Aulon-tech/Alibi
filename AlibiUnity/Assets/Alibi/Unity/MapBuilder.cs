@@ -56,6 +56,32 @@ namespace Alibi.Unity
         public const float WindowTop = 2.2f;
         public const float Scale = 4f;
 
+        // Shkallët (SH) janë kullë dy-katëshe; Bodrumi (BO) mbaron te niveli i tokës (y = 0).
+        public static float RoomTop(RoomLayout l)
+        {
+            if (l.Id == "SH") return UpperFloor + WallHeight;
+            if (l.Y < -0.01f) return 0f;
+            return l.Y + WallHeight;
+        }
+
+        // Lartësia e tavanit mbi dyshemenë e dhomës.
+        public static float CeilingHeight(RoomLayout l)
+        {
+            return RoomTop(l) - l.Y;
+        }
+
+        // Shkallët kryesore në SH: nga përdhesa (z0 + StairStart) deri te kati i parë (z0 + StairEnd).
+        public const int StairSteps = 14;
+        public const float StairStart = 1.2f;
+        public static float StairEnd(RoomLayout sh)
+        {
+            float stepDepth = sh.Depth * 0.7f / StairSteps;
+            return 1.5f + (StairSteps - 1) * stepDepth + stepDepth * 0.5f;
+        }
+
+        // Shkallët e bodrumit: zbresin nga dera SH–BO (z = Z1 e bodrumit) drejt jugut.
+        public const float CellarStairX0 = 4.5f, CellarStairX1 = 7.5f, CellarStairRun = 7.2f;
+
         public static readonly RoomLayout[] Layouts =
         {
             new RoomLayout("HO", 3 * Scale, 0, 7 * Scale, 3 * Scale, 0, "marble"),
@@ -192,12 +218,19 @@ namespace Alibi.Unity
                     new Vector3(w, 0.2f, d), Theme.Floor(l.Floor, w / 4f, d / 4f), true);
                 rv.FloorCollider = floor.GetComponent<Collider>();
                 floor.AddComponent<RoomClickTarget>().Room = rv;
+                floor.AddComponent<Walkable>();
 
-                // Ceiling. Kthina e shkalleve e ka tavanin lart, ne nivelin e katit te siperm,
-                // qe te mbetet nje hapesire dy kate e mbyllur e jo nje oborr pa çati.
-                float ceilY = info.Id == "SH" ? UpperFloor + WallHeight : l.Y + WallHeight;
-                Box(roomGo.transform, "Ceiling", new Vector3(l.Center.x, ceilY + 0.05f, l.Center.z),
-                    new Vector3(w - 0.1f, 0.1f, d - 0.1f), ceilingMat);
+                // Ceiling. RoomTop jep nivelin e sakte: kthina e shkalleve dy kate e larte,
+                // bodrumi me çati ne nivelin e tokes (me hapje per shkallet), te tjerat nje kat.
+                if (info.Id == "BO")
+                {
+                    BuildCellarStairs(roomGo.transform, rv, stepMat, capMat, baseMat);
+                }
+                else
+                {
+                    Box(roomGo.transform, "Ceiling", new Vector3(l.Center.x, RoomTop(l) + 0.05f, l.Center.z),
+                        new Vector3(w - 0.1f, 0.1f, d - 0.1f), ceilingMat);
+                }
 
                 // Baseboards along floor edges
                 float bbH = 0.12f, bbD = 0.04f;
@@ -209,9 +242,10 @@ namespace Alibi.Unity
                 // Support plinth for elevated rooms
                 if (l.Y > 0.01f)
                 {
+                    // me collider: lojtari nuk hyn më brenda bazamentit të katit të parë nga përdhesa
                     Box(roomGo.transform, "Plinth",
                         new Vector3(l.Center.x, l.Y * 0.5f - 0.1f, l.Center.z),
-                        new Vector3(w, l.Y - 0.2f, d), plinthMat);
+                        new Vector3(w, l.Y - 0.2f, d), plinthMat, true);
                 }
 
                 // Room highlight overlay
@@ -223,7 +257,9 @@ namespace Alibi.Unity
                 // Staircase steps (SH room)
                 if (info.Id == "SH")
                 {
-                    int numSteps = 14;
+                    // Sheshpushimi dhe hapat ndertohen me poshte ne kete bllok. Nuk thirret
+                    // BuildStairLanding: do te mbivendosej mbi to dhe do te krijonte z-fighting.
+                    int numSteps = StairSteps;
                     float stairWidth = l.Width * 0.6f;
                     float stepDepth = l.Depth * 0.7f / numSteps;
                     float stepRise = UpperFloor / numSteps;
@@ -296,17 +332,29 @@ namespace Alibi.Unity
             // Front door panel with proximity open/close
             BuildFrontDoor(root.transform, doorMat, doorFrameMat);
 
-            // Ground plane — small plate under villa kept for floor catcher
+            // Ground plane — small plate under villa kept for floor catcher.
+            // Nuk mbulon bodrumin: përndryshe pllaka do ta priste dhomën dhe shkallët poshtë.
+            bool hasCellar = present.Contains("BO");
+            float bx0 = float.MaxValue, bx1 = float.MinValue, bz0 = float.MaxValue, bz1 = float.MinValue;
+            foreach (var rv in view.Rooms.Values)
+            {
+                var l = rv.Layout;
+                if (l.Y < -0.01f) continue;
+                bx0 = Mathf.Min(bx0, l.X0); bx1 = Mathf.Max(bx1, l.X1);
+                bz0 = Mathf.Min(bz0, l.Z0); bz1 = Mathf.Max(bz1, l.Z1);
+            }
+            float plateZ0 = hasCellar ? bz0 : bz0 - 2f;
+            float plateZ1 = bz1 + 2f;
             var basePlate = Box(root.transform, "Base",
-                new Vector3(bounds.center.x, -0.3f, bounds.center.z),
-                new Vector3(bounds.size.x + 4f, 0.4f, bounds.size.z + 4f), baseMat);
+                new Vector3((bx0 + bx1) * 0.5f, -0.3f, (plateZ0 + plateZ1) * 0.5f),
+                new Vector3(bx1 - bx0 + 4f, 0.4f, plateZ1 - plateZ0), baseMat);
             basePlate.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
 
-            // Ground catcher for click detection
+            // Ground catcher for click detection (nën dyshemenë e bodrumit, që të mos e presë dhomën)
             var catcher = GameObject.CreatePrimitive(PrimitiveType.Cube);
             catcher.name = "GroundCatcher";
             catcher.transform.SetParent(root.transform, false);
-            catcher.transform.localPosition = new Vector3(bounds.center.x, -1f, bounds.center.z);
+            catcher.transform.localPosition = new Vector3(bounds.center.x, -4.2f, bounds.center.z);
             catcher.transform.localScale = new Vector3(200f, 0.2f, 200f);
             UnityEngine.Object.Destroy(catcher.GetComponent<Renderer>());
             catcher.AddComponent<GroundCatcher>().View = view;
@@ -329,19 +377,20 @@ namespace Alibi.Unity
             view.CrimeLight.shadows = LightShadows.Soft;
 
             // =========== EXTERIOR ENVIRONMENT ===========
-            BuildExterior(root.transform, bounds);
+            BuildExterior(root.transform, bounds, hasCellar, hasCellar ? Layout("BO") : default(RoomLayout));
 
             view.Bounds = bounds;
             view.BuildMarkers();
-            view.SecretPassage = BuildSecretPassage(root.transform, present);
-            if (view.SecretPassage != null) view.SecretPassage.SetActive(c.SecretEdgeActive);
+            view.SecretPassage = BuildSecretPassage(root.transform, view, present);
+            view.SecretHint = c.SecretEdgeExists ? BuildSecretHint(root.transform, present) : null;
+            view.SetSecretPassageVisible(c.SecretEdgeActive);
             return view;
         }
 
         // ================================================================
         //  BuildExterior — ground, sky enclosure, hedges, trees, moonlight
         // ================================================================
-        static void BuildExterior(Transform root, Bounds villaBounds)
+        static void BuildExterior(Transform root, Bounds villaBounds, bool cellarHole, RoomLayout cellar)
         {
             // Materials
             var grassMat   = Theme.Lit(new Color(0.14f, 0.22f, 0.10f), 0.06f);
@@ -358,10 +407,24 @@ namespace Alibi.Unity
 
             // --- Large ground plane (dark grass) ---
             float groundSize = 120f;
-            var ground = Box(root, "ExtGround",
-                new Vector3(cx, -0.52f, cz),
-                new Vector3(groundSize, 0.04f, groundSize), grassMat);
-            ground.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+            if (!cellarHole)
+            {
+                var ground = Box(root, "ExtGround",
+                    new Vector3(cx, -0.52f, cz),
+                    new Vector3(groundSize, 0.04f, groundSize), grassMat);
+                ground.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+            }
+            else
+            {
+                // Bari me një vrimë mbi bodrum: katër pjesë rreth tij, që shkallët dhe dhoma të mos priten.
+                float gx0 = cx - groundSize * 0.5f, gx1 = cx + groundSize * 0.5f;
+                float gz0 = cz - groundSize * 0.5f, gz1 = cz + groundSize * 0.5f;
+                float cx0 = cellar.X0, cx1 = cellar.X1, cz0 = cellar.Z0, cz1 = cellar.Z1;
+                GroundPiece(root, gx0, gx1, gz0, cz0, grassMat);
+                GroundPiece(root, gx0, gx1, cz1, gz1, grassMat);
+                GroundPiece(root, gx0, cx0, cz0, cz1, grassMat);
+                GroundPiece(root, cx1, gx1, cz0, cz1, grassMat);
+            }
 
             // --- Invisible wall colliders to keep player from walking off ---
             float wallDist = 55f;
@@ -591,7 +654,17 @@ namespace Alibi.Unity
             return m;
         }
 
-        static GameObject BuildSecretPassage(Transform root, HashSet<string> present)
+        // ================================================================
+        //  Kalimi i fshehtë Biblioteka–Zyra (Karta 4)
+        //  Biblioteka është në përdhesë, Zyra në katin e parë, mbi muret e njëra-tjetrës.
+        //  Pas «Kërko» në Bibliotekë, rafti hapet dhe dy dyer të arta lidhin dhomat:
+        //  kur lojtari hyn në njërën, del te tjetra (si shkallë të ngushta brenda murit).
+        // ================================================================
+        public const float SecretDoorZ_BI = 5.2f;   // nga Z0 e Bibliotekës
+        public const float SecretDoorZ_ZY = 4.0f;   // nga Z0 e Zyrës
+        public const float SecretDoorWidth = 2.0f;
+
+        static GameObject BuildSecretPassage(Transform root, VillaView view, HashSet<string> present)
         {
             if (!present.Contains("BI") || !present.Contains("ZY")) return null;
             var bi = Layout("BI");
@@ -599,33 +672,228 @@ namespace Alibi.Unity
             var go = new GameObject("SecretPassage_BI_ZY");
             go.transform.SetParent(root, false);
             var gold = Theme.Lit(Theme.Hex("#E2C27A"), 0.65f);
-            var glow = Theme.Ghost(Theme.WithAlpha(Theme.Gold, 0.45f));
-            float zMid = (Mathf.Max(bi.Z0, zy.Z0) + Mathf.Min(bi.Z1, zy.Z1)) * 0.5f;
-            float x = bi.X0;
-            const int steps = 14;
-            float stepW = 2.4f;
-            for (int s = 0; s < steps; s++)
-            {
-                float t = (s + 0.5f) / steps;
-                float y = Mathf.Lerp(bi.Y + 0.15f, zy.Y + 0.15f, t);
-                float xOff = Mathf.Lerp(1.2f, -1.2f, t);
-                Box(go.transform, "GoldStep" + s,
-                    new Vector3(x + xOff, y, zMid),
-                    new Vector3(stepW, 0.18f, 1.8f), gold);
-            }
-            FlatQuad(go.transform, "GoldGlow",
-                new Vector3(x, (bi.Y + zy.Y) * 0.5f + 0.5f, zMid),
-                new Vector2(1.2f, 2.5f), glow);
-            var lightGo = new GameObject("SecretLight");
-            lightGo.transform.SetParent(go.transform, false);
-            lightGo.transform.localPosition = new Vector3(x, (bi.Y + zy.Y) * 0.5f + 1.5f, zMid);
+            var dark = Theme.Lit(Theme.Hex("#0B0906"), 0.02f);
+            var shelfMat = Theme.Lit(Theme.Hex("#4A3320"), 0.15f);
+
+            // --- Biblioteka: rafti i hapur + hyrja e artë në murin perëndimor ---
+            float biFace = bi.X0 + WallThickness * 0.5f;
+            float biZ = bi.Z0 + SecretDoorZ_BI;
+            SecretDoorFrame(go.transform, "BI", biFace, +1f, bi.Y, biZ, gold, dark);
+            // rafti i rrotulluar 90°: qëndron pingul me murin, në anën jugore të derës
+            float hingeZ = biZ - SecretDoorWidth * 0.5f;
+            var shelf = Box(go.transform, "SwungShelf",
+                new Vector3(biFace + 0.95f, bi.Y + 1.15f, hingeZ - 0.16f),
+                new Vector3(1.9f, 2.3f, 0.3f), shelfMat, true);
+            ShelfBooks(go.transform, new Vector3(biFace + 0.95f, bi.Y, hingeZ - 0.33f), true);
+
+            var toZy = new GameObject("Door_BI_to_ZY");
+            toZy.transform.SetParent(go.transform, false);
+            toZy.transform.localPosition = new Vector3(biFace + 0.45f, bi.Y, biZ);
+            var a = toZy.AddComponent<SecretDoorway>();
+            a.View = view;
+            a.ToUpper = true;
+            a.TargetFeet = new Vector3(zy.X1 - 1.8f, zy.Y, zy.Z0 + SecretDoorZ_ZY);
+            a.TargetYaw = 270f;
+
+            // --- Zyra: dera e artë në murin lindor ---
+            float zyFace = zy.X1 - WallThickness * 0.5f;
+            float zyZ = zy.Z0 + SecretDoorZ_ZY;
+            SecretDoorFrame(go.transform, "ZY", zyFace, -1f, zy.Y, zyZ, gold, dark);
+            var toBi = new GameObject("Door_ZY_to_BI");
+            toBi.transform.SetParent(go.transform, false);
+            toBi.transform.localPosition = new Vector3(zyFace - 0.45f, zy.Y, zyZ);
+            var b = toBi.AddComponent<SecretDoorway>();
+            b.View = view;
+            b.ToUpper = false;
+            b.TargetFeet = new Vector3(bi.X0 + 1.8f, bi.Y, biZ);
+            b.TargetYaw = 90f;
+            return go;
+        }
+
+        // Para zbulimit: rafti mbyllur mbi derë, pak i shtyrë nga muri, me një fije drite ari.
+        static GameObject BuildSecretHint(Transform root, HashSet<string> present)
+        {
+            if (!present.Contains("BI") || !present.Contains("ZY")) return null;
+            var bi = Layout("BI");
+            var go = new GameObject("SecretHint_BI");
+            go.transform.SetParent(root, false);
+            var shelfMat = Theme.Lit(Theme.Hex("#4A3320"), 0.15f);
+            float face = bi.X0 + WallThickness * 0.5f;
+            float z = bi.Z0 + SecretDoorZ_BI;
+            var pivot = new GameObject("ShelfPivot");
+            pivot.transform.SetParent(go.transform, false);
+            pivot.transform.localPosition = new Vector3(face, bi.Y, z - SecretDoorWidth * 0.5f);
+            pivot.transform.localRotation = Quaternion.Euler(0f, -6f, 0f); // pak i hapur: «duket i lëvizur»
+            var panel = Box(pivot.transform, "LooseShelf", new Vector3(0.16f, 1.15f, SecretDoorWidth * 0.5f),
+                new Vector3(0.3f, 2.3f, SecretDoorWidth - 0.05f), shelfMat, true);
+            ShelfBooks(pivot.transform, new Vector3(0.33f, 0f, SecretDoorWidth * 0.5f), false);
+            // fija e dritës në skajin verior
+            var glow = Theme.Ghost(Theme.WithAlpha(Theme.Gold, 0.55f));
+            WallQuad(go.transform, "GoldSliver", new Vector3(face + 0.02f, bi.Y + 1.1f, z + SecretDoorWidth * 0.5f - 0.04f),
+                Vector3.right, 0.05f, 2.1f, glow);
+            return go;
+        }
+
+        static void SecretDoorFrame(Transform parent, string tag, float face, float inward, float floorY, float zc, Material gold, Material dark)
+        {
+            float half = SecretDoorWidth * 0.5f;
+            // hapja e errët
+            Box(parent, "SecretOpening_" + tag, new Vector3(face + inward * 0.012f, floorY + DoorHeight * 0.5f, zc),
+                new Vector3(0.02f, DoorHeight, SecretDoorWidth - 0.1f), dark);
+            // shkëlqim i artë brenda
+            var glow = Theme.Ghost(Theme.WithAlpha(Theme.Gold, 0.35f));
+            WallQuad(parent, "SecretGlow_" + tag, new Vector3(face + inward * 0.03f, floorY + 1.0f, zc),
+                new Vector3(inward, 0, 0), SecretDoorWidth - 0.3f, 1.8f, glow);
+            // korniza
+            Box(parent, "SecretPostA_" + tag, new Vector3(face + inward * 0.05f, floorY + DoorHeight * 0.5f, zc - half), new Vector3(0.1f, DoorHeight, 0.1f), gold);
+            Box(parent, "SecretPostB_" + tag, new Vector3(face + inward * 0.05f, floorY + DoorHeight * 0.5f, zc + half), new Vector3(0.1f, DoorHeight, 0.1f), gold);
+            Box(parent, "SecretLintel_" + tag, new Vector3(face + inward * 0.05f, floorY + DoorHeight + 0.05f, zc), new Vector3(0.1f, 0.1f, SecretDoorWidth + 0.1f), gold);
+            // drita
+            var lightGo = new GameObject("SecretLight_" + tag);
+            lightGo.transform.SetParent(parent, false);
+            lightGo.transform.localPosition = new Vector3(face + inward * 0.9f, floorY + 1.7f, zc);
             var light = lightGo.AddComponent<Light>();
             light.type = LightType.Point;
             light.color = Theme.Gold;
-            light.range = 8f;
-            light.intensity = 1.6f;
-            light.shadows = LightShadows.Soft;
+            light.range = 5f;
+            light.intensity = 2.2f;
+            light.shadows = LightShadows.None;
+        }
+
+        // Rreshta librash në faqen e raftit (pa collider).
+        static void ShelfBooks(Transform parent, Vector3 basePos, bool alongX)
+        {
+            string[] colors = { "#8C3B3B", "#3B5C8C", "#4C7A4C", "#B08A45", "#6B4A7A", "#9A5F3A" };
+            for (int row = 0; row < 4; row++)
+            {
+                float y = basePos.y + 0.35f + row * 0.5f;
+                for (int i = 0; i < 6; i++)
+                {
+                    float off = -0.75f + i * 0.3f;
+                    var mat = Theme.Lit(Theme.Hex(colors[(i + row * 2) % colors.Length]), 0.1f);
+                    var pos = alongX ? new Vector3(basePos.x + off, y, basePos.z) : new Vector3(basePos.x, y, basePos.z + off);
+                    var size = alongX ? new Vector3(0.24f, 0.36f, 0.04f) : new Vector3(0.04f, 0.36f, 0.24f);
+                    Box(parent, "Book", pos, size, mat);
+                }
+            }
+        }
+
+        // ================================================================
+        //  Lëvizja vertikale: rampa të padukshme, platforma dhe parmakë
+        // ================================================================
+
+        // Rampë e padukshme (vetëm collider) mbi shkallë, që lojtari të ngjitet butë.
+        static GameObject Ramp(Transform parent, RoomView rv, string name, float x0, float x1, float zLow, float yLow, float zHigh, float yHigh)
+        {
+            float dz = zHigh - zLow, dy = yHigh - yLow;
+            float len = Mathf.Sqrt(dz * dz + dy * dy);
+            float ang = Mathf.Atan2(dy, dz);
+            const float t = 0.1f;
+            var mid = new Vector3((x0 + x1) * 0.5f, (yLow + yHigh) * 0.5f, (zLow + zHigh) * 0.5f);
+            var normal = new Vector3(0f, Mathf.Cos(ang), -Mathf.Sin(ang));
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = mid - normal * (t * 0.5f);
+            go.transform.localRotation = Quaternion.Euler(-ang * Mathf.Rad2Deg, 0f, 0f);
+            var bc = go.AddComponent<BoxCollider>();
+            bc.size = new Vector3(x1 - x0, t, len);
+            go.AddComponent<Walkable>();
+            if (rv != null) go.AddComponent<RoomClickTarget>().Room = rv;
             return go;
+        }
+
+        // Pllakë ku mund të ecet, me sipërfaqen në topY.
+        static GameObject WalkSlab(Transform parent, RoomView rv, string name, float x0, float x1, float z0, float z1, float topY, Material mat)
+        {
+            var go = Box(parent, name, new Vector3((x0 + x1) * 0.5f, topY - 0.1f, (z0 + z1) * 0.5f),
+                new Vector3(x1 - x0, 0.2f, z1 - z0), mat, true);
+            go.AddComponent<Walkable>();
+            if (rv != null) go.AddComponent<RoomClickTarget>().Room = rv;
+            return go;
+        }
+
+        // Parmak i dukshëm (1 m) + pengesë e padukshme sa lartësia e syve, që lojtari të mos bjerë.
+        static void Railing(Transform parent, string name, Vector3 a, Vector3 b, Material mat)
+        {
+            var dir = b - a;
+            float len = dir.magnitude;
+            if (len < 0.05f) return;
+            var mid = (a + b) * 0.5f;
+            var rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
+            var top = Box(parent, name + "_Bar", mid + Vector3.up * 1.0f, Vector3.one, mat);
+            top.transform.localRotation = rot;
+            top.transform.localScale = new Vector3(0.06f, 0.06f, len);
+            int posts = Mathf.Max(2, Mathf.CeilToInt(len / 1.2f) + 1);
+            for (int i = 0; i < posts; i++)
+            {
+                var p = Vector3.Lerp(a, b, i / (float)(posts - 1));
+                Box(parent, name + "_Post" + i, p + Vector3.up * 0.5f, new Vector3(0.05f, 1.0f, 0.05f), mat);
+            }
+            var block = new GameObject(name + "_Block");
+            block.transform.SetParent(parent, false);
+            block.transform.localPosition = mid + Vector3.up * 1.3f;
+            block.transform.localRotation = rot;
+            var bc = block.AddComponent<BoxCollider>();
+            bc.size = new Vector3(0.1f, 2.6f, len);
+        }
+
+        static void GroundPiece(Transform root, float x0, float x1, float z0, float z1, Material mat)
+        {
+            if (x1 - x0 < 0.01f || z1 - z0 < 0.01f) return;
+            var g = Box(root, "ExtGround", new Vector3((x0 + x1) * 0.5f, -0.52f, (z0 + z1) * 0.5f),
+                new Vector3(x1 - x0, 0.04f, z1 - z0), mat);
+            g.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+        }
+
+        // Shkallët kryesore (SH): rampa mbi shkallë, sheshpushimi në krye dhe një korridor i ngushtë
+        // përgjatë murit perëndimor deri te dera e Korridorit (KO) në katin e parë.
+        static void BuildStairLanding(Transform parent, RoomView rv, Material floorMat, Material railMat)
+        {
+            var l = rv.Layout;
+            float stairX0 = l.Center.x - l.Width * 0.3f;
+            float stairX1 = l.Center.x + l.Width * 0.3f;
+            float zLow = l.Z0 + StairStart;
+            float zHigh = l.Z0 + StairEnd(l);
+            float top = UpperFloor;
+            float walkZ0 = l.Z0 + 0.85f * Scale; // pak para derës SH–KO (z0 + 1·Scale)
+
+            Ramp(parent, rv, "StairRamp", stairX0, stairX1, zLow, 0f, zHigh, top);
+            WalkSlab(parent, rv, "StairLanding", l.X0 + 0.1f, l.X1 - 0.1f, zHigh, l.Z1 - 0.1f, top, floorMat);
+            WalkSlab(parent, rv, "StairWalkway", l.X0 + 0.1f, stairX0, walkZ0, zHigh, top, floorMat);
+
+            Railing(parent, "WalkwayRail", new Vector3(stairX0, top, walkZ0), new Vector3(stairX0, top, zHigh), railMat);
+            Railing(parent, "WalkwayEndRail", new Vector3(l.X0 + 0.15f, top, walkZ0), new Vector3(stairX0, top, walkZ0), railMat);
+            Railing(parent, "LandingRail", new Vector3(stairX1, top, zHigh), new Vector3(l.X1 - 0.15f, top, zHigh), railMat);
+        }
+
+        // Bodrumi: shkallë guri nga dera SH–BO poshtë në dyshemenë e bodrumit, çati në nivelin e tokës
+        // me hapje mbi shkallë dhe parmakë rreth saj.
+        static void BuildCellarStairs(Transform parent, RoomView rv, Material stepMat, Material railMat, Material roofMat)
+        {
+            var l = rv.Layout;
+            float sx0 = l.X0 + CellarStairX0, sx1 = l.X0 + CellarStairX1;
+            float zTop = l.Z1, zBot = l.Z1 - CellarStairRun;
+            const int n = 12;
+            float rise = -l.Y / n;
+            float dep = CellarStairRun / n;
+            for (int s = 0; s < n - 1; s++)
+            {
+                float tread = -rise * (s + 1);
+                float h = tread - l.Y;
+                Box(parent, "CellarStep" + s,
+                    new Vector3((sx0 + sx1) * 0.5f, l.Y + h * 0.5f, zTop - dep * (s + 0.5f)),
+                    new Vector3(sx1 - sx0, h, dep * 0.98f), stepMat);
+            }
+            Ramp(parent, rv, "CellarRamp", sx0, sx1, zBot, l.Y, zTop, 0f);
+
+            // çatia (mund të ecet sipër nga jashtë), pa pjesën mbi shkallë
+            WalkSlab(parent, rv, "CellarRoofW", l.X0, sx0, l.Z0, l.Z1, 0f, roofMat);
+            WalkSlab(parent, rv, "CellarRoofE", sx1, l.X1, l.Z0, l.Z1, 0f, roofMat);
+            WalkSlab(parent, rv, "CellarRoofS", sx0, sx1, l.Z0, zBot, 0f, roofMat);
+
+            Railing(parent, "CellarRailW", new Vector3(sx0 - 0.05f, 0f, zBot), new Vector3(sx0 - 0.05f, 0f, zTop - 0.2f), railMat);
+            Railing(parent, "CellarRailE", new Vector3(sx1 + 0.05f, 0f, zBot), new Vector3(sx1 + 0.05f, 0f, zTop - 0.2f), railMat);
+            Railing(parent, "CellarRailS", new Vector3(sx0, 0f, zBot - 0.05f), new Vector3(sx1, 0f, zBot - 0.05f), railMat);
         }
 
         static bool IsExteriorEdge(HashSet<string> present, RoomLayout room, bool vertical, float at)
@@ -661,30 +929,31 @@ namespace Alibi.Unity
 
             float baseY = room.Y;
             if (other != null) baseY = Mathf.Max(room.Y, Layout(other).Y);
+            // Maja e murit: kulla e shkallëve shkon deri në katin e parë, bodrumi mbaron te toka.
+            float wallTop = RoomTop(room);
+            if (other != null) wallTop = Mathf.Max(wallTop, RoomTop(Layout(other)));
+            float wallH = wallTop - baseY;
 
             bool exterior = (other == null);
             Material useMat = exterior ? wallMat : wallInnerMat;
 
-            // Kthina e shkalleve eshte dy kate e larte. Muret rreth saj ngjiten deri ne tavanin
-            // e katit te siperm, perndryshe kush qendron ne sheshpushim shikon mbi to ne qiell.
+            // Kthina e shkalleve eshte dy kate e larte: xhami i saj shkon nga afer dyshemeja
+            // deri nen tavan. RoomTop e mban majen e murit te sakte per çdo dhome.
             bool tall = room.Id == "SH" || other == "SH";
-            float wallH = (tall ? UpperFloor + WallHeight : baseY + WallHeight) - baseY;
 
-            // Kur dy dhomat jane ne lartesi te ndryshme (Korridori mbi Shkallet), muri fillon
-            // te dyshemeja me e larte dhe poshte mbetet e hapur. Mbylle, perndryshe lojtari
-            // del nga shtepia pikerisht nen katin e siperm.
+            // Mur i plotë poshtë kur dy dhoma fqinje janë në nivele të ndryshme (p.sh. Biblioteka nën Zyrë,
+            // Shkallët nën Korridor, Bodrumi nën Shkallë). Pa të, nga dhoma e poshtme shihej bazamenti bosh.
             if (other != null)
             {
                 float lowY = Mathf.Min(room.Y, Layout(other).Y);
                 if (baseY - lowY > 0.05f)
                 {
-                    Vector3 skirtCenter = vertical
-                        ? new Vector3(at, (lowY + baseY) * 0.5f, (from + to) * 0.5f)
-                        : new Vector3((from + to) * 0.5f, (lowY + baseY) * 0.5f, at);
-                    Vector3 skirtSize = vertical
-                        ? new Vector3(WallThickness, baseY - lowY, (to - from) + WallThickness)
-                        : new Vector3((to - from) + WallThickness, baseY - lowY, WallThickness);
-                    Box(root, "WallSkirt", skirtCenter, skirtSize, useMat, true);
+                    float lmid = (from + to) * 0.5f;
+                    float llen = to - from;
+                    float lh = baseY - lowY;
+                    Vector3 lc = vertical ? new Vector3(at, lowY + lh * 0.5f, lmid) : new Vector3(lmid, lowY + lh * 0.5f, at);
+                    Vector3 ls = vertical ? new Vector3(WallThickness, lh, llen + WallThickness) : new Vector3(llen + WallThickness, lh, WallThickness);
+                    Box(root, "WallLower", lc, ls, useMat, true);
                 }
             }
 
@@ -821,7 +1090,7 @@ namespace Alibi.Unity
                 Box(root, "DoorLintel", lintelCenter, lintelSize, doorFrameMat);
 
                 // Wall above door (from door top to wall top)
-                float aboveDoorH = WallHeight - DoorHeight - 0.1f;
+                float aboveDoorH = wallH - DoorHeight - 0.1f;
                 if (aboveDoorH > 0.1f)
                 {
                     Vector3 aboveCenter = vertical
@@ -1033,15 +1302,18 @@ namespace Alibi.Unity
         public GameObject CrimeDecal;
         public Light CrimeLight;
         public GameObject SecretPassage;
+        public GameObject SecretHint;
         public Action<int> RoomClicked;
         public Action<int> SuspectClicked;
         public Action BackgroundClicked;
+        public Action<bool> SecretPassageUsed; // true = u ngjit në Zyrë, false = zbriti në Bibliotekë
         public CameraRig Rig;
         float crimeTarget;
 
         public void SetSecretPassageVisible(bool on)
         {
             if (SecretPassage != null) SecretPassage.SetActive(on);
+            if (SecretHint != null) SecretHint.SetActive(!on);
         }
 
         public void BuildMarkers()
@@ -1088,6 +1360,42 @@ namespace Alibi.Unity
         void Update()
         {
             if (CrimeLight != null) CrimeLight.intensity = Mathf.Lerp(CrimeLight.intensity, crimeTarget, Time.deltaTime * 4f);
+        }
+    }
+
+    // Shënon sipërfaqet ku këmbët e lojtarit mund të qëndrojnë (dysheme, rampa shkallësh, sheshpushime).
+    // CameraRig ndjek vetëm këto, që lojtari të mos hipë mbi tavolina apo mobilje.
+    public sealed class Walkable : MonoBehaviour { }
+
+    // Dera e kalimit të fshehtë: kur lojtari i afrohet, del te dera tjetër (Biblioteka ↔ Zyra).
+    public sealed class SecretDoorway : MonoBehaviour
+    {
+        public VillaView View;
+        public Vector3 TargetFeet;   // në koordinatat lokale të vilës
+        public float TargetYaw;
+        public bool ToUpper;
+        public float Radius = 0.8f;
+        static float lastUse = -10f;
+        CameraRig rig;
+
+        void Update()
+        {
+            if (rig == null)
+            {
+                rig = View != null && View.Rig != null ? View.Rig : FindAnyObjectByType<CameraRig>();
+                if (rig == null) return;
+            }
+            if (rig.Mode == CameraMode.Overview) return;
+            if (Time.unscaledTime - lastUse < 1.2f) return;
+            var feet = rig.FpPosition - Vector3.up * rig.EyeHeight;
+            var p = transform.position;
+            if (Mathf.Abs(feet.y - p.y) > 1f) return;
+            float dx = feet.x - p.x, dz = feet.z - p.z;
+            if (dx * dx + dz * dz > Radius * Radius) return;
+            lastUse = Time.unscaledTime;
+            var world = View != null ? View.transform.TransformPoint(TargetFeet) : TargetFeet;
+            rig.Teleport(world, TargetYaw);
+            if (View != null && View.SecretPassageUsed != null) View.SecretPassageUsed(ToUpper);
         }
     }
 

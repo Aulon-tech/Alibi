@@ -310,7 +310,17 @@ namespace Alibi.Unity
 
             // Ngjitja behet menjehere qe hapi tjeter te mos e bllokoje ecjen; zbritja butesisht.
             float y = targetY > fpPosition.y ? targetY : Mathf.Lerp(fpPosition.y, targetY, Mathf.Clamp01(dt * GroundFollow));
-            fpPosition.y = Mathf.Clamp(y, -3f + EyeHeight, MapBuilder.UpperFloor + MapBuilder.WallHeight - 0.3f);
+            // Kufiri i poshtem le pak hapesire nen dyshemene e bodrumit (-3), qe zbritja atje te mos bllokohet.
+            fpPosition.y = Mathf.Clamp(y, -4f + EyeHeight, MapBuilder.UpperFloor + MapBuilder.WallHeight - 0.3f);
+        }
+
+        // Kalon lojtarin menjëherë në një pikë tjetër (p.sh. kalimi i fshehtë Biblioteka–Zyra).
+        public void Teleport(Vector3 feetWorld, float yawDegrees)
+        {
+            fpPosition = feetWorld + Vector3.up * EyeHeight;
+            fpYaw = yawDegrees;
+            tdHasPos = false;
+            UpdatePlayerBody();
         }
 
         void ComputeThirdPerson(out Vector3 pos, out Quaternion rot)

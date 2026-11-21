@@ -34,6 +34,9 @@ namespace Alibi.Unity
                 d.Dress();
             }
 
+            // Skena e krimit sipas kartës (Karta 3, Karta 4) — para banorëve, që ata të mos qëndrojnë mbi të.
+            CaseScene.Build(view);
+
             var life = root.AddComponent<HouseLife>();
             life.View = view;
             AddRoleLooksToMarkers(view, kit);
@@ -625,8 +628,7 @@ namespace Alibi.Unity
             {
                 var go = new GameObject(name);
                 go.transform.SetParent(parent, false);
-                float lampY = (l.Id == "SH" ? MapBuilder.UpperFloor + MapBuilder.WallHeight : l.Y + MapBuilder.WallHeight) - 0.3f;
-                go.transform.localPosition = new Vector3(l.Center.x, lampY, l.Center.z);
+                go.transform.localPosition = new Vector3(l.Center.x, l.Y + MapBuilder.CeilingHeight(l) - 0.3f, l.Center.z);
                 var light = go.AddComponent<Light>();
                 light.type = LightType.Point;
                 light.color = color;
@@ -636,13 +638,14 @@ namespace Alibi.Unity
             }
 
             // =========== CEILING LIGHT FIXTURES ===========
-            void CeilingFixture(string style)
+            void CeilingFixture(string style, float atU = -1f, float atV = -1f)
             {
-                // Kthina e shkalleve e ka tavanin ne nivelin e katit te siperm.
-                float ceilY = (l.Id == "SH" ? MapBuilder.UpperFloor + MapBuilder.WallHeight : MapBuilder.WallHeight) / DS;
+                // CeilingHeight jep lartesine e sakte per çdo dhome: kthina e shkalleve dy kate,
+                // bodrumi deri ne nivelin e tokes, te tjerat nje kat.
+                float ceilY = MapBuilder.CeilingHeight(l) / DS;
                 float fixtureY = ceilY - 0.08f;
-                float cU = (l.Center.x - l.X0) / PS;
-                float cV = (l.Center.z - l.Z0) / PS;
+                float cU = atU >= 0f ? atU : (l.Center.x - l.X0) / PS;
+                float cV = atV >= 0f ? atV : (l.Center.z - l.Z0) / PS;
 
                 switch (style)
                 {
@@ -1135,17 +1138,20 @@ namespace Alibi.Unity
 
             void Cellar()
             {
-                CeilingFixture("industrial");
+                // Shkallët e bodrumit zënë u 1.125–1.875, v 1.4–3.2 (shih MapBuilder.BuildCellarStairs):
+                // llamba dhe sendet qëndrojnë jashtë kësaj zone.
+                float dv = d / PS; // thellësia në njësitë e vjetra (u, v)
+                CeilingFixture("industrial", 1.5f, 0.75f);
                 // Crates
                 Cube("CrateA", M("#7C5A3A", 0.1f), 0.25f, 0.25f, 0f, 0.32f, 0.32f, 0.32f);
                 Cube("CrateB", M("#8A6A44", 0.1f), 0.25f, 0.25f, 0.32f, 0.26f, 0.26f, 0.26f, false, 18f);
                 Cube("CrateC", M("#6A5A3A", 0.1f), 0.6f, 0.25f, 0f, 0.3f, 0.28f, 0.3f);
-                Cube("CrateD", M("#9A7A54", 0.1f), 1.5f, 2.5f, 0f, 0.28f, 0.28f, 0.28f);
+                Cube("CrateD", M("#9A7A54", 0.1f), 2.5f, 1.2f, 0f, 0.28f, 0.28f, 0.28f);
                 // Barrels
                 Cyl("BarrelS", M("#5B3F2A"), 2.72f, 0.27f, 0f, 0.38f, 0.5f);
-                Cyl("BarrelNW", M("#5B3F2A"), 0.3f, d - 0.28f, 0f, 0.38f, 0.5f);
-                Cyl("BarrelNE", M("#5B3F2A"), 2.72f, d - 0.28f, 0f, 0.38f, 0.5f);
-                Cyl("BarrelSmall", M("#7C5A3A"), 1.0f, d - 0.3f, 0f, 0.28f, 0.4f);
+                Cyl("BarrelNW", M("#5B3F2A"), 0.3f, dv - 0.28f, 0f, 0.38f, 0.5f);
+                Cyl("BarrelNE", M("#5B3F2A"), 2.72f, dv - 0.28f, 0f, 0.38f, 0.5f);
+                Cyl("BarrelSmall", M("#7C5A3A"), 0.75f, dv - 0.3f, 0f, 0.28f, 0.4f);
                 // Wine racks with bottles
                 Cube("WineRackW", M("#4A3320"), 0.2f, 1.6f, 0f, 0.24f, 0.7f, 1.0f);
                 Cube("WineRackE", M("#4A3320"), 2.8f, 1.6f, 0f, 0.24f, 0.7f, 1.0f);
@@ -1165,10 +1171,10 @@ namespace Alibi.Unity
                 Cyl("ShovelHandle", M("#B8923F", 0.1f), 2.4f, 0.15f, 0f, 0.02f, 0.75f, false);
                 Cube("ShovelBlade", M("#6A6F73", 0.3f), 2.4f, 0.15f, 0.75f, 0.1f, 0.08f, 0.015f, false);
                 // Old chair
-                Cube("OldChairSeat", M("#6A5A3A", 0.1f), 1.9f, 1.8f, 0f, 0.24f, 0.2f, 0.24f);
-                Cube("OldChairBack", M("#6A5A3A", 0.1f), 1.9f, 1.92f, 0.2f, 0.24f, 0.2f, 0.03f, false);
+                Cube("OldChairSeat", M("#6A5A3A", 0.1f), 2.3f, 1.8f, 0f, 0.24f, 0.2f, 0.24f);
+                Cube("OldChairBack", M("#6A5A3A", 0.1f), 2.3f, 1.92f, 0.2f, 0.24f, 0.2f, 0.03f, false);
                 // Rope coil on floor
-                Cyl("RopeCoil", M("#9A8A6A", 0.1f), 2.1f, 2.5f, 0f, 0.18f, 0.06f, false);
+                Cyl("RopeCoil", M("#9A8A6A", 0.1f), 2.25f, 2.5f, 0f, 0.18f, 0.06f, false);
                 // Dusty shelf with jars
                 Cube("CellarShelf", M("#4A3320"), 1.5f, 0.15f, 0.5f, 1.0f, 0.03f, 0.22f, false);
                 for (int i = 0; i < 4; i++)

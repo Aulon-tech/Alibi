@@ -116,6 +116,11 @@ namespace Alibi.Unity
                 tab = 0;
                 InteractWithSuspect(s);
             };
+            villa.SecretPassageUsed = up =>
+            {
+                if (canvas == null) return;
+                Panels.Toast(canvas.transform, up ? "Kalove nga kalimi i fshehtë: tani je në Zyrë." : "Kalove nga kalimi i fshehtë: tani je në Bibliotekë.", Theme.Gold, 2.5f);
+            };
             AlibiFlow.DisableForeignCamerasAndLights(transform);
             animator = gameObject.AddComponent<PropagationAnimator>();
 
@@ -408,6 +413,7 @@ namespace Alibi.Unity
             float zMin = float.MaxValue, zMax = float.MinValue;
             foreach (var l in MapBuilder.Layouts)
             {
+                if (caseDef.RoomIndex(l.Id) < 0) continue;
                 if (l.X0 < wMin) wMin = l.X0;
                 if (l.X1 > wMax) wMax = l.X1;
                 if (l.Z0 < zMin) zMin = l.Z0;
@@ -420,9 +426,10 @@ namespace Alibi.Unity
             float drawH = mapH - pad * 2;
             float scale = Mathf.Min(drawW / worldW, drawH / worldD);
 
-            // Draw each room as an outlined rectangle
+            // Draw each room as an outlined rectangle (vetëm dhomat e kësaj karte)
             foreach (var l in MapBuilder.Layouts)
             {
+                if (caseDef.RoomIndex(l.Id) < 0) continue;
                 float rx = pad + (l.X0 - wMin) * scale;
                 float ry = pad + (l.Z0 - zMin) * scale;
                 float rw = (l.X1 - l.X0) * scale;
@@ -470,6 +477,7 @@ namespace Alibi.Unity
                     if (l.Id == d.B) { b = l; fb = true; }
                 }
                 if (!fa || !fb) continue;
+                if (caseDef.RoomIndex(d.A) < 0 || caseDef.RoomIndex(d.B) < 0) continue;
 
                 // Calculate center of each room on minimap
                 float ax = pad + ((a.X0 + a.X1) * 0.5f - wMin) * scale;
@@ -528,6 +536,7 @@ namespace Alibi.Unity
             float zMin = float.MaxValue, zMax = float.MinValue;
             foreach (var l in MapBuilder.Layouts)
             {
+                if (caseDef.RoomIndex(l.Id) < 0) continue;
                 if (l.X0 < wMin) wMin = l.X0;
                 if (l.X1 > wMax) wMax = l.X1;
                 if (l.Z0 < zMin) zMin = l.Z0;
@@ -567,6 +576,12 @@ namespace Alibi.Unity
             {
                 if (res == null || !res.gameObject.activeInHierarchy) continue;
                 if (res.Visual != null && !res.Visual.activeSelf) continue;
+                // vetëm në të njëjtin kat (p.sh. jo dikush në Zyrë kur lojtari është në Bibliotekë poshtë)
+                if (Mathf.Abs(res.transform.position.y - (playerPos.y - rig.EyeHeight)) > 2f)
+                {
+                    if (res.NameLabel != null && res.NameLabel.activeSelf) res.NameLabel.SetActive(false);
+                    continue;
+                }
                 float dist = Vector3.Distance(playerPos, res.transform.position);
 
                 // Show/hide name label based on proximity
@@ -747,7 +762,9 @@ namespace Alibi.Unity
         {
             UI.Clear(hudHost);
             var chip = UI.Card(hudHost, "HudTitle", new Color(0.05f, 0.06f, 0.08f, 0.85f), Theme.Line, 10);
-            string title = Truth ? "E VËRTETA E ZBULUAR" : (caseDef.Level >= 2 ? "VILA · PËRDHESA DHE KATI I PARË" : "VILA · PËRDHESA");
+            string title = Truth ? "E VËRTETA E ZBULUAR"
+                : caseDef.RoomIndex("BO") >= 0 ? "VILA · PËRDHESA, KATI I PARË DHE BODRUMI"
+                : caseDef.Level >= 2 ? "VILA · PËRDHESA DHE KATI I PARË" : "VILA · PËRDHESA";
             string sub = Truth ? "Pozicionet reale në " + caseDef.Hours[currentTime] : "Çfarë dihet për " + caseDef.Hours[currentTime];
             float w = Mathf.Max(UI.TextWidth(title, Theme.Mono, 13), UI.TextWidth(sub, Theme.Sans, 14)) + 30;
             UI.Place(chip.rectTransform, 14, BarH + 14, w, 58);
@@ -1132,10 +1149,30 @@ namespace Alibi.Unity
                     ShowOverlay(1);
                 });
             }
+            else if (CaseStory.ShouldShow(caseDef))
+            {
+                PlayStory();
+            }
             else
             {
                 ShowOverlay(1);
             }
+        }
+
+        public bool HasStory { get { return CaseStory.For(caseDef) != null; } }
+
+        // Rrëfimi i kartës (Karta 3, Karta 4); pas tij kthehet te përmbledhja e rastit.
+        public void PlayStory()
+        {
+            var story = CaseStory.For(caseDef);
+            if (story == null) { ShowOverlay(1); return; }
+            CloseOverlay();
+            var iv = gameObject.AddComponent<IntroVideo>();
+            iv.PlayStory(canvas.transform, caseDef, story, () =>
+            {
+                if (iv != null) Destroy(iv);
+                ShowOverlay(1);
+            });
         }
 
         void ShowHowTo()
