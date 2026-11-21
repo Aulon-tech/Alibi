@@ -18,6 +18,10 @@ namespace Alibi.Unity
         int current;
         bool advancing;
         CaseDefinition caseDef;
+        string[][] slides = Slides;
+        string heading;
+        bool genericIntro = true;
+        float slideDuration = SlideDuration;
 
         static readonly string[][] Slides = new string[][]
         {
@@ -40,6 +44,25 @@ namespace Alibi.Unity
         }
 
         public void Play(Transform canvas, CaseDefinition c, System.Action finished)
+        {
+            slides = Slides;
+            heading = null;
+            genericIntro = true;
+            slideDuration = SlideDuration;
+            Begin(canvas, c, finished);
+        }
+
+        // Rrëfimi i një karte (Karta 3, Karta 4): pamje më të gjata, me titullin e kartës sipër.
+        public void PlayStory(Transform canvas, CaseDefinition c, CaseStory.Story story, System.Action finished)
+        {
+            slides = story.Slides;
+            heading = story.Heading;
+            genericIntro = false;
+            slideDuration = 7f;
+            Begin(canvas, c, finished);
+        }
+
+        void Begin(Transform canvas, CaseDefinition c, System.Action finished)
         {
             caseDef = c;
             onFinished = finished;
@@ -86,9 +109,9 @@ namespace Alibi.Unity
             bar.pivot = new Vector2(0.5f, 0);
             bar.anchoredPosition = new Vector2(0, 32);
             float dotW = 10, gap = 8;
-            float totalW = Slides.Length * dotW + (Slides.Length - 1) * gap;
+            float totalW = slides.Length * dotW + (slides.Length - 1) * gap;
             bar.sizeDelta = new Vector2(totalW, dotW);
-            for (int i = 0; i < Slides.Length; i++)
+            for (int i = 0; i < slides.Length; i++)
             {
                 var dot = new GameObject("Dot" + i, typeof(RectTransform), typeof(Image));
                 dot.transform.SetParent(bar, false);
@@ -109,7 +132,7 @@ namespace Alibi.Unity
         {
             var bar = root.Find("Dots");
             if (bar == null) return;
-            for (int i = 0; i < Slides.Length; i++)
+            for (int i = 0; i < slides.Length; i++)
             {
                 var dot = bar.GetChild(i);
                 var img = dot.GetComponent<Image>();
@@ -121,10 +144,10 @@ namespace Alibi.Unity
         {
             yield return null; // frame delay
             AdvanceSlide();
-            while (current < Slides.Length)
+            while (current < slides.Length)
             {
-                yield return new WaitForSeconds(SlideDuration);
-                if (current < Slides.Length - 1)
+                yield return new WaitForSeconds(slideDuration);
+                if (current < slides.Length - 1)
                     AdvanceSlide();
                 else
                     break;
@@ -134,7 +157,7 @@ namespace Alibi.Unity
         void AdvanceSlide()
         {
             current++;
-            if (current >= Slides.Length)
+            if (current >= slides.Length)
             {
                 Finish();
                 return;
@@ -164,7 +187,7 @@ namespace Alibi.Unity
             for (int i = host.childCount - 1; i >= 0; i--)
                 Destroy(host.GetChild(i).gameObject);
 
-            BuildSlide(host, Slides[current]);
+            BuildSlide(host, slides[current]);
             UpdateDots();
 
             // Fade in
@@ -192,6 +215,12 @@ namespace Alibi.Unity
             container.anchoredPosition = new Vector2(0, 20);
             container.sizeDelta = new Vector2(700, 400);
 
+            if (!string.IsNullOrEmpty(heading))
+            {
+                var head = UI.LabelAt(container, heading, Theme.Mono, 13, Theme.Gold, 0, -46, 700, 20);
+                head.alignment = TextAnchor.UpperCenter;
+            }
+
             // Icon badge — large centered circle
             var badge = UI.Panel(container, "Badge", Theme.WithAlpha(Theme.Gold, 0.12f), 40, false);
             badge.rectTransform.anchorMin = badge.rectTransform.anchorMax = new Vector2(0.5f, 1);
@@ -214,18 +243,19 @@ namespace Alibi.Unity
             line.rectTransform.sizeDelta = new Vector2(120, 1);
 
             // Body text
-            var bodyLabel = UI.LabelAt(container, body, Theme.Sans, 18, Theme.Text2, 60, 180, 580, 120);
+            var bodyLabel = UI.LabelAt(container, body, Theme.Sans, 18, Theme.Text2, 40, 180, 620, 150);
             bodyLabel.alignment = TextAnchor.UpperCenter;
 
             // Slide number indicator
-            var numText = UI.LabelAt(container, (current + 1) + " / " + Slides.Length, Theme.Mono, 12, Theme.Muted, 0, 340, 700, 20);
+            var numText = UI.LabelAt(container, (current + 1) + " / " + slides.Length, Theme.Mono, 12, Theme.Muted, 0, 340, 700, 20);
             numText.alignment = TextAnchor.UpperCenter;
         }
 
         void Finish()
         {
             StopAllCoroutines();
-            MarkSeen();
+            if (genericIntro) MarkSeen();
+            else CaseStory.MarkSeen(caseDef);
             if (root != null) Destroy(root.gameObject);
             if (onFinished != null) onFinished();
         }

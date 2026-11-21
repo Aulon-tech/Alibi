@@ -281,6 +281,40 @@ namespace Alibi.Unity
                 desired.y = Mathf.Clamp(desired.y, -3f + EyeHeight, MapBuilder.UpperFloor + MapBuilder.WallHeight - 0.3f);
                 fpPosition = desired;
             }
+
+            FollowFloor(dt);
+        }
+
+        // Lartësia e këmbëve ndjek dyshemenë poshtë lojtarit: shkallët për në katin e parë,
+        // shkallët e bodrumit dhe sheshpushimet. Merren parasysh vetëm sipërfaqet Walkable.
+        const float StepUp = 0.6f;
+        static readonly RaycastHit[] floorHits = new RaycastHit[24];
+
+        void FollowFloor(float dt)
+        {
+            float feet = fpPosition.y - EyeHeight;
+            var origin = new Vector3(fpPosition.x, feet + StepUp, fpPosition.z);
+            int n = Physics.RaycastNonAlloc(origin, Vector3.down, floorHits, StepUp + 8f, ~0, QueryTriggerInteraction.Ignore);
+            float best = float.NegativeInfinity;
+            for (int i = 0; i < n; i++)
+            {
+                var col = floorHits[i].collider;
+                if (col == null || col.GetComponent<Walkable>() == null) continue;
+                if (floorHits[i].point.y > best) best = floorHits[i].point.y;
+            }
+            if (float.IsNegativeInfinity(best)) return; // jashtë vilës: mbetet në lartësinë ku është
+            float target = best + EyeHeight;
+            float speed = target > fpPosition.y ? 7f : 10f;
+            fpPosition.y = Mathf.MoveTowards(fpPosition.y, target, speed * dt);
+        }
+
+        // Kalon lojtarin menjëherë në një pikë tjetër (p.sh. kalimi i fshehtë Biblioteka–Zyra).
+        public void Teleport(Vector3 feetWorld, float yawDegrees)
+        {
+            fpPosition = feetWorld + Vector3.up * EyeHeight;
+            fpYaw = yawDegrees;
+            tdHasPos = false;
+            UpdatePlayerBody();
         }
 
         void ComputeThirdPerson(out Vector3 pos, out Quaternion rot)

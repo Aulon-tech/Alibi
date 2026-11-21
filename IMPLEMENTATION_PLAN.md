@@ -484,3 +484,22 @@ Will be completed after implementation with status for each:
 | 33 | All existing tests pass | §8 | DONE | Core files untouched, no API changes |
 | 34 | No broken existing features | §8 | DONE | All game logic preserved, UI-only changes |
 | 35 | Performance acceptable | §8 | DONE | Procedural UI, no heavy assets, same loop |
+
+---
+
+## Phase 12: Karta 3 dhe Karta 4 (rrëfimi + pamja 3D)
+
+| Karta | Çfarë kërkon | Çfarë u shtua |
+|-------|--------------|---------------|
+| 3 · Dorëshkrimi | 5 të dyshuar, 7 dhoma (SH + KO lart), krimi BI@22:00, dëshmitar që gabon një herë | Rrëfim hyrës (5 pamje) + mbyllje pas fitores; skena e krimit në Bibliotekë: vitrinë e thyer bosh, konturi me shkumës, faqe, karrige e rrëzuar, shenja provash, shirit policie |
+| 4 · Kalimi i fshehtë | 6 të dyshuar, 9 dhoma (+ ZY lart, BO poshtë), vjedhje në ZY, kalimi BI–ZY | Rrëfim hyrës + mbyllje; kasafortë e hapur dhe letra në Zyrë; raft "i lëvizur" në Bibliotekë që hapet pas «Kërko» si derë e artë BI↔ZY |
+
+**Lëvizja vertikale (ishte e prishur për Kartat 2–4):** kamera mbante gjithmonë të njëjtën lartësi, shkallët nuk kishin collider, kështu Korridori, Zyra dhe Bodrumi nuk arriheshin.
+- `CameraRig.FollowFloor`: këmbët ndjekin vetëm sipërfaqet `Walkable` (dysheme, rampa, sheshpushime), jo mobiljet.
+- `MapBuilder`: rampë mbi shkallët e SH, sheshpushim + korridor i ngushtë deri te dera e KO, parmakë; kulla e shkallëve 7.6 m me tavan.
+- Bodrumi: shkallë guri nga dera SH–BO, çati në nivelin e tokës me hapje, mure deri te toka, bari dhe pllaka bazë me vrimë mbi bodrum.
+- Mure të plota poshtë kur dy dhoma fqinje janë në nivele të ndryshme (BI/ZY, SH/KO, SH/BO); bazamentet e katit të parë kanë collider.
+
+**Skedarë të rinj:** `CaseStory.cs` (tekstet), `CaseScene.cs` (skenat e krimit). `IntroVideo.PlayStory` luan rrëfimin; butoni «Rrëfimi ▸» në përmbledhje e rihap.
+
+**Pa verifikuar në Unity:** kodi kompilohet kundër DLL-ve të Unity 6000.6 (me dhe pa Input System), por nuk është provuar në Play.
