@@ -73,7 +73,7 @@ namespace Alibi.Unity
         // legs with knee-caps and calf muscles, clothing accents (collar, buttons,
         // belt buckle, shoe soles). Still built entirely from Sphere/Cube/Cylinder
         // primitives — no external meshes.
-        static void BuildHumanoidBody(Transform parent, Material bodyMat, Material skinMat, Material hairMat, Material shoeMat)
+        internal static void BuildHumanoidBody(Transform parent, Material bodyMat, Material skinMat, Material hairMat, Material shoeMat)
         {
             // --- shared accent materials ---
             var urp = Shader.Find("Universal Render Pipeline/Lit");

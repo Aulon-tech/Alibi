@@ -143,25 +143,28 @@ namespace Alibi.Unity
             var go = new GameObject("PlayerBody");
             go.transform.SetParent(transform, false);
             playerBody = go.transform;
-            var dark = Theme.Lit(new Color(0.12f, 0.14f, 0.18f), 0.3f);
 
-            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            body.name = "Body";
-            body.transform.SetParent(go.transform, false);
-            body.transform.localPosition = new Vector3(0, 0.72f, 0);
-            body.transform.localScale = new Vector3(0.42f, 0.72f, 0.42f);
-            body.GetComponent<Renderer>().sharedMaterial = dark;
-            var bc = body.GetComponent<Collider>();
-            if (bc != null) Object.Destroy(bc);
+            var coatMat = Theme.Lit(Theme.Hex("#3A4256"), 0.35f);
+            var skinMat = Theme.Lit(Theme.Hex("#F5D4B0"), 0.55f);
+            var hairMat = Theme.Lit(Theme.Hex("#2A1E16"), 0.2f);
+            var shoeMat = Theme.Lit(Theme.Hex("#1E1A18"), 0.4f);
+            HouseDressing.BuildHumanoidBody(go.transform, coatMat, skinMat, hairMat, shoeMat);
 
-            var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            head.name = "Head";
-            head.transform.SetParent(go.transform, false);
-            head.transform.localPosition = new Vector3(0, 1.58f, 0);
-            head.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
-            head.GetComponent<Renderer>().sharedMaterial = dark;
-            var hc = head.GetComponent<Collider>();
-            if (hc != null) Object.Destroy(hc);
+            var hatMat = Theme.Lit(Theme.Hex("#2B2622"), 0.25f);
+            var bandMat = Theme.Lit(Theme.Hex("#8C6A3A"), 0.3f);
+            HouseDressing.Part(go.transform, PrimitiveType.Cylinder, "HatBrim", new Vector3(0, 1.76f, 0), new Vector3(0.40f, 0.008f, 0.40f), hatMat);
+            HouseDressing.Part(go.transform, PrimitiveType.Cylinder, "HatCrown", new Vector3(0, 1.83f, 0), new Vector3(0.29f, 0.07f, 0.29f), hatMat);
+            HouseDressing.Part(go.transform, PrimitiveType.Cylinder, "HatBand", new Vector3(0, 1.785f, 0), new Vector3(0.295f, 0.018f, 0.295f), bandMat);
+
+            var lightGo = new GameObject("PlayerLight");
+            lightGo.transform.SetParent(go.transform, false);
+            lightGo.transform.localPosition = new Vector3(0, 2.2f, 0.5f);
+            var pl = lightGo.AddComponent<Light>();
+            pl.type = LightType.Point;
+            pl.color = new Color(1f, 0.95f, 0.85f);
+            pl.intensity = 2.2f;
+            pl.range = 4.5f;
+            pl.shadows = LightShadows.None;
 
             rig.PlayerBody = playerBody;
 

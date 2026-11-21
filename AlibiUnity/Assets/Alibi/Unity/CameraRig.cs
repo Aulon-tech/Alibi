@@ -33,6 +33,13 @@ namespace Alibi.Unity
         public float TpHeight = 0.5f;
         public Transform PlayerBody;
 
+        // Top-down (Pamje nga lart) settings
+        public float TopDownDistance = 5.5f;
+        public float TopDownPitch = 42f;
+        public float TopDownMaxPitch = 80f;
+        public float TopDownTargetHeight = 1.1f;
+        float tdPitch = -1f;
+
         float currentYaw;
         float currentSize = 8f;
         Vector3 currentPos;
@@ -166,6 +173,10 @@ namespace Alibi.Unity
             {
                 TpDistance = Mathf.Clamp(TpDistance / factor, 1.5f, 8f);
             }
+            else if (Mode == CameraMode.TopDown)
+            {
+                TopDownDistance = Mathf.Clamp(TopDownDistance / factor, 3f, 10f);
+            }
             else
             {
                 Zoom = Mathf.Clamp(Zoom * factor, 0.7f, 2.6f);
@@ -291,12 +302,31 @@ namespace Alibi.Unity
 
         void ComputeTopDown(out Vector3 pos, out Quaternion rot)
         {
-            // Place camera directly above and slightly behind the player
-            float height = 8f;
-            float backDist = 3f;
-            var back = Quaternion.Euler(0, fpYaw, 0) * Vector3.back;
-            pos = fpPosition + Vector3.up * height + back * backDist;
-            rot = Quaternion.LookRotation(fpPosition - pos);
+            var lookTarget = fpPosition + Vector3.down * (EyeHeight - TopDownTargetHeight);
+
+            float needed = TopDownMaxPitch;
+            for (float p = TopDownPitch; p < TopDownMaxPitch; p += 6f)
+            {
+                var testDir = Quaternion.Euler(p, fpYaw, 0f) * Vector3.back;
+                if (!Physics.SphereCast(lookTarget, 0.25f, testDir, out _, TopDownDistance, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    needed = p;
+                    break;
+                }
+            }
+
+            float dt = Time.unscaledDeltaTime;
+            if (tdPitch < 0f) tdPitch = needed;
+            else if (needed > tdPitch) tdPitch = Mathf.Lerp(tdPitch, needed, Mathf.Clamp01(dt * 10f));
+            else tdPitch = Mathf.Lerp(tdPitch, needed, Mathf.Clamp01(dt * 3f));
+
+            rot = Quaternion.Euler(tdPitch, fpYaw, 0f);
+            var dir = rot * Vector3.back;
+            float dist = TopDownDistance;
+            RaycastHit hit;
+            if (Physics.SphereCast(lookTarget, 0.25f, dir, out hit, TopDownDistance, ~0, QueryTriggerInteraction.Ignore))
+                dist = Mathf.Max(0.6f, hit.distance - 0.1f);
+            pos = lookTarget + dir * dist;
         }
 
         void UpdatePlayerBody()
