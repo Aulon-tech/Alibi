@@ -193,12 +193,11 @@ namespace Alibi.Unity
                 rv.FloorCollider = floor.GetComponent<Collider>();
                 floor.AddComponent<RoomClickTarget>().Room = rv;
 
-                // Ceiling
-                if (info.Id != "SH")
-                {
-                    Box(roomGo.transform, "Ceiling", new Vector3(l.Center.x, l.Y + WallHeight + 0.05f, l.Center.z),
-                        new Vector3(w - 0.1f, 0.1f, d - 0.1f), ceilingMat);
-                }
+                // Ceiling. Kthina e shkalleve e ka tavanin lart, ne nivelin e katit te siperm,
+                // qe te mbetet nje hapesire dy kate e mbyllur e jo nje oborr pa çati.
+                float ceilY = info.Id == "SH" ? UpperFloor + WallHeight : l.Y + WallHeight;
+                Box(roomGo.transform, "Ceiling", new Vector3(l.Center.x, ceilY + 0.05f, l.Center.z),
+                    new Vector3(w - 0.1f, 0.1f, d - 0.1f), ceilingMat);
 
                 // Baseboards along floor edges
                 float bbH = 0.12f, bbD = 0.04f;
@@ -233,9 +232,29 @@ namespace Alibi.Unity
                         float xPos = l.Center.x;
                         float zPos = l.Z0 + 1.5f + s * stepDepth;
                         float yPos = s * stepRise + stepRise * 0.5f;
+                        // Thellesia pak me e madhe se hapi: hapat mbulohen me njeri-tjetrin dhe
+                        // nuk mbetet e çare ku lojtari bie nje kat poshte per nje frame.
                         Box(roomGo.transform, "Step" + s,
                             new Vector3(xPos, yPos, zPos),
-                            new Vector3(stairWidth, stepRise, stepDepth * 0.95f), stepMat);
+                            new Vector3(stairWidth, stepRise, stepDepth * 1.06f), stepMat, true);
+                    }
+
+                    // Sheshpushimi lart: lidh majen e shkalleve me deren e Korridorit ne murin perendimor.
+                    // Pa te, maja e shkalleve del mbi boshllek dhe kati i siperm nuk arrihet.
+                    // Fillon pak para skajit te hapit te fundit, qe te mos mbetet vrime ne mes.
+                    float topZ = l.Z0 + 1.5f + (numSteps - 1) * stepDepth + stepDepth * 0.3f;
+                    if (l.Z1 - topZ > 0.2f)
+                    {
+                        Box(roomGo.transform, "LandingN",
+                            new Vector3(l.Center.x, UpperFloor - 0.1f, (topZ + l.Z1) * 0.5f),
+                            new Vector3(l.Width, 0.2f, l.Z1 - topZ), stepMat, true);
+                    }
+                    float westW = l.Center.x - stairWidth * 0.5f - l.X0;
+                    if (westW > 0.2f)
+                    {
+                        Box(roomGo.transform, "LandingW",
+                            new Vector3(l.X0 + westW * 0.5f, UpperFloor - 0.1f, l.Center.z),
+                            new Vector3(westW, 0.2f, l.Depth), stepMat, true);
                     }
                     // Stair railing (simple box railing on each side)
                     float railH = 0.9f;
@@ -646,6 +665,29 @@ namespace Alibi.Unity
             bool exterior = (other == null);
             Material useMat = exterior ? wallMat : wallInnerMat;
 
+            // Kthina e shkalleve eshte dy kate e larte. Muret rreth saj ngjiten deri ne tavanin
+            // e katit te siperm, perndryshe kush qendron ne sheshpushim shikon mbi to ne qiell.
+            bool tall = room.Id == "SH" || other == "SH";
+            float wallH = (tall ? UpperFloor + WallHeight : baseY + WallHeight) - baseY;
+
+            // Kur dy dhomat jane ne lartesi te ndryshme (Korridori mbi Shkallet), muri fillon
+            // te dyshemeja me e larte dhe poshte mbetet e hapur. Mbylle, perndryshe lojtari
+            // del nga shtepia pikerisht nen katin e siperm.
+            if (other != null)
+            {
+                float lowY = Mathf.Min(room.Y, Layout(other).Y);
+                if (baseY - lowY > 0.05f)
+                {
+                    Vector3 skirtCenter = vertical
+                        ? new Vector3(at, (lowY + baseY) * 0.5f, (from + to) * 0.5f)
+                        : new Vector3((from + to) * 0.5f, (lowY + baseY) * 0.5f, at);
+                    Vector3 skirtSize = vertical
+                        ? new Vector3(WallThickness, baseY - lowY, (to - from) + WallThickness)
+                        : new Vector3((to - from) + WallThickness, baseY - lowY, WallThickness);
+                    Box(root, "WallSkirt", skirtCenter, skirtSize, useMat, true);
+                }
+            }
+
             // Collect door cuts
             var cuts = new List<Vector2>();
             if (other != null)
@@ -668,14 +710,15 @@ namespace Alibi.Unity
                 cuts.Sort((a, b) => a.x.CompareTo(b.x));
             }
 
-            // Window cuts for exterior walls (not basement, not staircase)
+            // Window cuts for exterior walls (not basement). Kthina e shkalleve i merr
+            // dritaret e saj te larta — xhami nga afer dyshemeja deri nen tavan.
             var windowCuts = new List<Vector2>();
-            if (exterior && room.Id != "BO" && room.Id != "SH")
+            if (exterior && room.Id != "BO")
             {
                 float edgeLen = to - from;
                 if (edgeLen > 6f)
                 {
-                    float winW = 2.0f;
+                    float winW = tall ? 3.2f : 2.0f;
                     float center1 = from + edgeLen * 0.3f;
                     float center2 = from + edgeLen * 0.7f;
                     windowCuts.Add(new Vector2(center1 - winW * 0.5f, center1 + winW * 0.5f));
@@ -716,23 +759,23 @@ namespace Alibi.Unity
                 {
                     // Solid wall segment, full height
                     Vector3 center = vertical
-                        ? new Vector3(at, baseY + WallHeight * 0.5f, mid)
-                        : new Vector3(mid, baseY + WallHeight * 0.5f, at);
+                        ? new Vector3(at, baseY + wallH * 0.5f, mid)
+                        : new Vector3(mid, baseY + wallH * 0.5f, at);
                     Vector3 size = vertical
-                        ? new Vector3(WallThickness, WallHeight, len + WallThickness)
-                        : new Vector3(len + WallThickness, WallHeight, WallThickness);
+                        ? new Vector3(WallThickness, wallH, len + WallThickness)
+                        : new Vector3(len + WallThickness, wallH, WallThickness);
                     Box(root, "Wall", center, size, useMat, true);
                 }
                 else
                 {
                     // Wall with window openings: build parts around windows
-                    BuildWallWithWindows(root, vertical, at, baseY, s, segWindows, useMat, glassMat);
+                    BuildWallWithWindows(root, vertical, at, baseY, wallH, s, segWindows, useMat, glassMat, tall);
                 }
 
                 // Wall cap / crown molding
                 Vector3 capCenter = vertical
-                    ? new Vector3(at, baseY + WallHeight + 0.03f, mid)
-                    : new Vector3(mid, baseY + WallHeight + 0.03f, at);
+                    ? new Vector3(at, baseY + wallH + 0.03f, mid)
+                    : new Vector3(mid, baseY + wallH + 0.03f, at);
                 Vector3 capSize = vertical
                     ? new Vector3(WallThickness + 0.08f, 0.06f, len + WallThickness + 0.08f)
                     : new Vector3(len + WallThickness + 0.08f, 0.06f, WallThickness + 0.08f);
@@ -792,14 +835,18 @@ namespace Alibi.Unity
             }
         }
 
-        static void BuildWallWithWindows(Transform root, bool vertical, float at, float baseY,
-            Vector2 seg, List<Vector2> windows, Material wallMat, Material glassMat)
+        static void BuildWallWithWindows(Transform root, bool vertical, float at, float baseY, float wallH,
+            Vector2 seg, List<Vector2> windows, Material wallMat, Material glassMat, bool tall)
         {
             // Sort windows by position
             windows.Sort((a, b) => a.x.CompareTo(b.x));
 
+            // Ne kthinen e shkalleve xhami eshte i larte, nga afer dyshemeja deri nen tavan.
+            float winBottom = tall ? 0.6f : WindowBottom;
+            float winTop = tall ? wallH - 0.8f : WindowTop;
+
             // Build wall below windows (from floor to windowBottom)
-            float belowH = WindowBottom;
+            float belowH = winBottom;
             if (belowH > 0.05f)
             {
                 float mid = (seg.x + seg.y) * 0.5f;
@@ -814,14 +861,14 @@ namespace Alibi.Unity
             }
 
             // Build wall above windows (from windowTop to ceiling)
-            float aboveH = WallHeight - WindowTop;
+            float aboveH = wallH - winTop;
             if (aboveH > 0.05f)
             {
                 float mid = (seg.x + seg.y) * 0.5f;
                 float len = seg.y - seg.x;
                 Vector3 center = vertical
-                    ? new Vector3(at, baseY + WindowTop + aboveH * 0.5f, mid)
-                    : new Vector3(mid, baseY + WindowTop + aboveH * 0.5f, at);
+                    ? new Vector3(at, baseY + winTop + aboveH * 0.5f, mid)
+                    : new Vector3(mid, baseY + winTop + aboveH * 0.5f, at);
                 Vector3 size = vertical
                     ? new Vector3(WallThickness, aboveH, len + WallThickness)
                     : new Vector3(len + WallThickness, aboveH, WallThickness);
@@ -830,7 +877,7 @@ namespace Alibi.Unity
 
             // Build pillars between windows and wall segments at window height
             float cur = seg.x;
-            float windowH = WindowTop - WindowBottom;
+            float windowH = winTop - winBottom;
             foreach (var w in windows)
             {
                 // Pillar before window
@@ -839,8 +886,8 @@ namespace Alibi.Unity
                     float pillarLen = w.x - cur;
                     float pillarMid = (cur + w.x) * 0.5f;
                     Vector3 center = vertical
-                        ? new Vector3(at, baseY + WindowBottom + windowH * 0.5f, pillarMid)
-                        : new Vector3(pillarMid, baseY + WindowBottom + windowH * 0.5f, at);
+                        ? new Vector3(at, baseY + winBottom + windowH * 0.5f, pillarMid)
+                        : new Vector3(pillarMid, baseY + winBottom + windowH * 0.5f, at);
                     Vector3 size = vertical
                         ? new Vector3(WallThickness, windowH, pillarLen)
                         : new Vector3(pillarLen, windowH, WallThickness);
@@ -851,8 +898,8 @@ namespace Alibi.Unity
                 float winMid = (w.x + w.y) * 0.5f;
                 float winW = w.y - w.x;
                 Vector3 glassCenter = vertical
-                    ? new Vector3(at, baseY + WindowBottom + windowH * 0.5f, winMid)
-                    : new Vector3(winMid, baseY + WindowBottom + windowH * 0.5f, at);
+                    ? new Vector3(at, baseY + winBottom + windowH * 0.5f, winMid)
+                    : new Vector3(winMid, baseY + winBottom + windowH * 0.5f, at);
                 Vector3 glassSize = vertical
                     ? new Vector3(WallThickness * 0.3f, windowH - 0.1f, winW - 0.1f)
                     : new Vector3(winW - 0.1f, windowH - 0.1f, WallThickness * 0.3f);
@@ -863,16 +910,16 @@ namespace Alibi.Unity
                 float frameT = 0.06f;
                 // Sill
                 Vector3 sillCenter = vertical
-                    ? new Vector3(at, baseY + WindowBottom - frameT * 0.5f, winMid)
-                    : new Vector3(winMid, baseY + WindowBottom - frameT * 0.5f, at);
+                    ? new Vector3(at, baseY + winBottom - frameT * 0.5f, winMid)
+                    : new Vector3(winMid, baseY + winBottom - frameT * 0.5f, at);
                 Vector3 sillSize = vertical
                     ? new Vector3(WallThickness + 0.15f, frameT, winW + 0.1f)
                     : new Vector3(winW + 0.1f, frameT, WallThickness + 0.15f);
                 Box(root, "WindowSill", sillCenter, sillSize, frameMat);
                 // Top
                 Vector3 topCenter = vertical
-                    ? new Vector3(at, baseY + WindowTop + frameT * 0.5f, winMid)
-                    : new Vector3(winMid, baseY + WindowTop + frameT * 0.5f, at);
+                    ? new Vector3(at, baseY + winTop + frameT * 0.5f, winMid)
+                    : new Vector3(winMid, baseY + winTop + frameT * 0.5f, at);
                 Box(root, "WindowTop", topCenter, sillSize, frameMat);
 
                 cur = w.y;

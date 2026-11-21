@@ -33,6 +33,10 @@ namespace Alibi.Unity
         public float TpHeight = 0.5f;
         public Transform PlayerBody;
 
+        // Ecja vertikale: sa lart ngjitet me nje hap dhe sa shpejt zbret.
+        public float StepUp = 0.5f;
+        public float GroundFollow = 14f;
+
         // Top-down (Pamje nga lart) settings
         public float TopDownDistance = 2.4f;
         public float TopDownShoulder = 0.55f;
@@ -281,6 +285,32 @@ namespace Alibi.Unity
                 desired.y = Mathf.Clamp(desired.y, -3f + EyeHeight, MapBuilder.UpperFloor + MapBuilder.WallHeight - 0.3f);
                 fpPosition = desired;
             }
+
+            FollowGround(dt);
+        }
+
+        // Mban syrin mbi dyshemene qe ka nen kembe. Pa kete, ecja eshte vetem horizontale
+        // dhe kati i siperm (Korridori i Kartes 2) nuk arrihet kurre.
+        void FollowGround(float dt)
+        {
+            var origin = fpPosition + Vector3.up * StepUp;
+            float maxDist = StepUp + EyeHeight + 3f;
+            var hits = Physics.RaycastAll(origin, Vector3.down, maxDist, ~0, QueryTriggerInteraction.Ignore);
+            float best = float.NegativeInfinity;
+            for (int i = 0; i < hits.Length; i++)
+            {
+                if (hits[i].normal.y < 0.5f) continue;                             // mure dhe anet e hapave
+                if (hits[i].collider.gameObject.name == "ClickTarget") continue;   // figurat e te dyshuarve
+                if (hits[i].point.y > best) best = hits[i].point.y;
+            }
+            if (best == float.NegativeInfinity) return;   // s'ka dysheme poshte: mos e prek lartesine
+
+            float targetY = best + EyeHeight;
+            if (targetY > fpPosition.y + StepUp) return;  // parvaz i larte, jo hap: mos u ngjit
+
+            // Ngjitja behet menjehere qe hapi tjeter te mos e bllokoje ecjen; zbritja butesisht.
+            float y = targetY > fpPosition.y ? targetY : Mathf.Lerp(fpPosition.y, targetY, Mathf.Clamp01(dt * GroundFollow));
+            fpPosition.y = Mathf.Clamp(y, -3f + EyeHeight, MapBuilder.UpperFloor + MapBuilder.WallHeight - 0.3f);
         }
 
         void ComputeThirdPerson(out Vector3 pos, out Quaternion rot)

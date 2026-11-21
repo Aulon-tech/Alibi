@@ -2,6 +2,7 @@
 // Procedural UI: titull + butona (majtas), siluet detektivi me rim-light (djathtas)
 // Lupe SDF, rreze drite, grimca ari — pa prefab, pa asset
 using System.Collections;
+using Alibi.Core;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -580,6 +581,18 @@ namespace Alibi.Unity
             btn.onClick.AddListener(() => StartCard(c));
         }
 
+        // «Rast i ri»: rast i gjeneruar ne nivelin ku ka arritur lojtari. Nese gjeneruesi
+        // nuk gjen dot rast te vlefshem, kthehemi te karta e radhes.
+        void StartNewCase()
+        {
+            PlayerPrefs.SetInt("alibi_newcase", 1);
+            int level = Mathf.Clamp(AlibiFlow.NextCard(), 1, 4);
+            var spec = LevelCards.Spec(level);
+            var type = spec.Types != null && spec.Types.Length > 0 ? spec.Types[0] : CaseType.Vrasja;
+            var result = CaseGenerator.Generate(level, type, Random.Range(1, 999999));
+            AlibiFlow.StartCase(result.Case ?? LevelCards.Card(level));
+        }
+
         void CloseLevelSelect()
         {
             if (_levelOverlay != null)
@@ -589,11 +602,14 @@ namespace Alibi.Unity
             }
         }
 
+        // Karta qe zgjodhi lojtari i kalohet GameManager-it permes AlibiFlow.PendingCase.
+        // Me pare ruhej vetem ne PlayerPrefs ("alibi_card"), te cilin nuk e lexonte askush,
+        // prandaj çdo kartë hapte Karten 1.
         void StartCard(int card)
         {
             PlayerPrefs.SetInt("alibi_card", card);
             PlayerPrefs.DeleteKey("alibi_newcase");
-            SceneManager.LoadScene("Alibi_Game");
+            AlibiFlow.StartCase(LevelCards.Card(card));
         }
 
         // ==============================================================
@@ -604,13 +620,9 @@ namespace Alibi.Unity
         {
             switch (idx)
             {
-                case 0: StartCard(1); break;
+                case 0: StartCard(AlibiFlow.NextCard()); break;   // «Vazhdo»: karta e radhes
                 case 1: ShowLevelSelect(); break;
-                case 2:
-                    PlayerPrefs.SetInt("alibi_card", 1);
-                    PlayerPrefs.SetInt("alibi_newcase", 1);
-                    SceneManager.LoadScene("Alibi_Game");
-                    break;
+                case 2: StartNewCase(); break;
                 case 3: ShowIntro(); break;
                 case 4:
                     Application.Quit();

@@ -625,7 +625,8 @@ namespace Alibi.Unity
             {
                 var go = new GameObject(name);
                 go.transform.SetParent(parent, false);
-                go.transform.localPosition = new Vector3(l.Center.x, l.Y + MapBuilder.WallHeight - 0.3f, l.Center.z);
+                float lampY = (l.Id == "SH" ? MapBuilder.UpperFloor + MapBuilder.WallHeight : l.Y + MapBuilder.WallHeight) - 0.3f;
+                go.transform.localPosition = new Vector3(l.Center.x, lampY, l.Center.z);
                 var light = go.AddComponent<Light>();
                 light.type = LightType.Point;
                 light.color = color;
@@ -637,7 +638,8 @@ namespace Alibi.Unity
             // =========== CEILING LIGHT FIXTURES ===========
             void CeilingFixture(string style)
             {
-                float ceilY = MapBuilder.WallHeight / DS;
+                // Kthina e shkalleve e ka tavanin ne nivelin e katit te siperm.
+                float ceilY = (l.Id == "SH" ? MapBuilder.UpperFloor + MapBuilder.WallHeight : MapBuilder.WallHeight) / DS;
                 float fixtureY = ceilY - 0.08f;
                 float cU = (l.Center.x - l.X0) / PS;
                 float cV = (l.Center.z - l.Z0) / PS;
@@ -1019,6 +1021,40 @@ namespace Alibi.Unity
                 // Small table with candle
                 Cube("StairTable", M("#5B3F2A"), 2.8f, 0.3f, 0f, 0.3f, 0.35f, 0.25f);
                 Candle(2.8f, 0.3f, 0.35f, "StairCandle");
+
+                // --- Kthina eshte dy kate e larte: zbukurime qe ngjiten bashke me shkallet ---
+                float[] vs = { 0.7f, 1.5f, 2.3f };
+                string[] frames = { "#5B3F2A", "#4A3320", "#5B3F2A" };
+                string[] arts = { "#3B5C8C", "#6E4A2E", "#2E5A4A" };
+                for (int i = 0; i < vs.Length; i++)
+                {
+                    // Lartesia e hapit perballe kesaj pike, ne metra mbi dyshemene e kthines.
+                    float h = (vs[i] * PS - 1.5f) * MapBuilder.UpperFloor / (l.Depth * 0.7f);
+                    // Piktura ne murin lindor, 1.1 m mbi hapin perballe tyre.
+                    float y0 = (h + 1.1f) / DS;
+                    Cube("StairArtFrame" + i, M(frames[i], 0.3f), 2.96f, vs[i], y0, 0.03f, 0.54f, 0.44f, false);
+                    Cube("StairArtCanvas" + i, M(arts[i], 0.05f), 2.93f, vs[i], y0 + 0.02f, 0.015f, 0.5f, 0.4f, false);
+                    // Llambe muri mes pikturave
+                    float sy = (h + 2.0f) / DS;
+                    Cube("StairSconce" + i, M("#2B2B2E", 0.3f), 2.95f, vs[i] + 0.45f, sy, 0.06f, 0.1f, 0.08f, false);
+                    Ball("StairBulb" + i, kit.Glow("#FFD79A", 1.8f), 2.88f, vs[i] + 0.45f, sy + 0.08f, 0.13f);
+                }
+
+                // Flamur i gjate ne murin verior, perballe atij qe ngjitet shkallet
+                float bannerY = (MapBuilder.UpperFloor + 0.7f) / DS;
+                Cube("StairBanner", M("#6E2F37", 0.1f), 1.5f, 2.96f, bannerY, 0.52f, 1.25f, 0.02f, false);
+                Cube("StairBannerRod", M("#B8923F", 0.5f), 1.5f, 2.95f, bannerY + 1.25f, 0.62f, 0.04f, 0.05f, false);
+
+                // Drite e dyte ne mes te kthines: tavani i larte nuk i ndrit dot hapat vete
+                var midGo = new GameObject("StairMidLight");
+                midGo.transform.SetParent(parent, false);
+                midGo.transform.localPosition = new Vector3(l.Center.x, l.Y + MapBuilder.UpperFloor * 0.6f, l.Center.z);
+                var midLight = midGo.AddComponent<Light>();
+                midLight.type = LightType.Point;
+                midLight.color = new Color(1f, 0.87f, 0.66f);
+                midLight.intensity = 2.4f;
+                midLight.range = Mathf.Max(l.Width, l.Depth) * 0.9f;
+                midLight.shadows = LightShadows.None;
             }
 
             void Corridor()
