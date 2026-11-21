@@ -190,27 +190,28 @@ namespace Alibi.Unity
             if (o == null || o.Statement == null) return 0;
             var st = o.Statement;
             var sus = C.Suspects[st.Suspect];
-            var card = UI.Card(content, "LastAnswer", Theme.Hex("#0D1017"), Theme.WithAlpha(Theme.Gold, 0.25f), 14);
+            var card = Panels.ParchmentCard(content, "LastAnswer");
             var root = card.transform;
             float pad = 18, iw = w - pad * 2, iy = 14;
 
             // Header: suspect info
             UI.Avatar(root, sus, 42, pad, iy);
-            UI.LabelAt(root, sus.Def, Theme.SansBold, 18, Theme.Text, pad + 54, iy + 2, iw - 54, 22);
-            UI.LabelAt(root, st.QuestionText + "  #" + st.Id, Theme.Sans, 13, Theme.Muted, pad + 54, iy + 24, iw - 54, 18);
+            UI.LabelAt(root, sus.Def, Theme.SansBold, 18, Theme.ParchInk, pad + 54, iy + 2, iw - 54, 22);
+            UI.LabelAt(root, st.QuestionText + "  #" + st.Id, Theme.Sans, 13, Theme.ParchMuted, pad + 54, iy + 24, iw - 54, 18);
             iy += 52;
 
             // Speech bubble with answer
-            var bubble = UI.Card(root, "Bubble", Theme.WithAlpha(Theme.Gold, 0.06f), Theme.WithAlpha(Theme.Gold, 0.15f), 10);
+            var bubble = UI.Panel(root, "Bubble", new Color(1f, 1f, 1f, 0.38f), 10, false);
+            UI.Border(bubble.transform, Theme.WithAlpha(Theme.ParchInk, 0.22f), 10);
             float bubPad = 14;
-            float ansH = Panels.Paragraph(bubble.transform, "«" + st.Text + "»", Theme.SerifItalic, 26, Theme.Parchment, bubPad, bubPad, iw - bubPad * 2);
+            float ansH = Panels.Paragraph(bubble.transform, "«" + st.Text + "»", Theme.SerifItalic, 26, Theme.ParchInk, bubPad, bubPad, iw - bubPad * 2);
             float bubH = ansH + bubPad * 2;
             UI.Place(bubble.rectTransform, pad, iy, iw, bubH);
             iy += bubH + 8;
 
             // Formal constraint
-            var formalBg = UI.Panel(root, "Formal", Theme.WithAlpha(Theme.Gold, 0.08f), 8, false);
-            float fh = Panels.Paragraph(formalBg.transform, st.Formal, Theme.Mono, 13, Theme.Gold, 10, 8, iw - 20);
+            var formalBg = UI.Panel(root, "Formal", new Color(0.16f, 0.13f, 0.09f, 0.10f), 8, false);
+            float fh = Panels.Paragraph(formalBg.transform, st.Formal, Theme.Mono, 13, Theme.Hex("#7A5A22"), 10, 8, iw - 20);
             UI.Place(formalBg.rectTransform, pad, iy, iw, fh + 16);
             iy += fh + 24;
 
@@ -221,9 +222,9 @@ namespace Alibi.Unity
             foreach (var chipText in new[] { budgetChip, elimChip })
             {
                 float cw = UI.TextWidth(chipText, Theme.Sans, 13) + 24;
-                var chip = UI.Card(root, "Chip", new Color(0, 0, 0, 0.2f), Theme.Line, 14);
+                var chip = UI.Card(root, "Chip", new Color(0.16f, 0.13f, 0.09f, 0.07f), Theme.WithAlpha(Theme.ParchInk, 0.22f), 14);
                 UI.Place(chip.rectTransform, cx, iy, cw, 28);
-                var t = UI.Label(chip.transform, chipText, Theme.Sans, 13, Theme.Text2, TextAnchor.MiddleCenter);
+                var t = UI.Label(chip.transform, chipText, Theme.Sans, 13, Theme.ParchMuted, TextAnchor.MiddleCenter);
                 UI.Stretch(t.rectTransform, 0, 0, 0, 0);
                 t.horizontalOverflow = HorizontalWrapMode.Overflow;
                 cx += cw + 8;
@@ -232,11 +233,11 @@ namespace Alibi.Unity
 
             if (o.Duplicate)
             {
-                iy += Panels.Paragraph(root, "Kjo pyetje ishte bërë më parë dhe nuk solli informacion të ri.", Theme.Sans, 14, Theme.Hex("#E2C27A"), pad, iy, iw) + 6;
+                iy += Panels.Paragraph(root, "Kjo pyetje ishte bërë më parë dhe nuk solli informacion të ri.", Theme.Sans, 14, Theme.Hex("#8E2C24"), pad, iy, iw) + 6;
             }
             if (S.UnverifiedConfirmation(st))
             {
-                iy += Panels.Paragraph(root, "Konfirmim i paverifikuar (R07b): asnjëri nga të dy nuk është ende jashtë dyshimit, prandaj kjo nuk i nxjerr jashtë.", Theme.Sans, 14, Theme.Muted, pad, iy, iw) + 6;
+                iy += Panels.Paragraph(root, "Konfirmim i paverifikuar (R07b): asnjëri nga të dy nuk është ende jashtë dyshimit, prandaj kjo nuk i nxjerr jashtë.", Theme.Sans, 14, Theme.ParchMuted, pad, iy, iw) + 6;
             }
             if (o.NewlyCleared.Count > 0)
             {
@@ -244,23 +245,23 @@ namespace Alibi.Unity
                 foreach (var k in o.NewlyCleared) names.Add(C.Suspects[k].Def);
                 string verb = names.Count > 1 ? "dolën jashtë dyshimit: nuk mund të ishin" : "doli jashtë dyshimit: nuk mund të ishte";
                 string when = C.CrimeTimeKnown ? " në " + C.Hours[C.CrimeTime] : " në asnjë orë të mundshme";
-                iy += Panels.Paragraph(root, QuestionEngine.JoinNames(names) + " " + verb + " në " + C.Rooms[C.CrimeRoom].Loc + when + ".", Theme.Sans, 15, Theme.Blue, pad, iy, iw) + 6;
+                iy += Panels.Paragraph(root, QuestionEngine.JoinNames(names) + " " + verb + " në " + C.Rooms[C.CrimeRoom].Loc + when + ".", Theme.Sans, 15, Theme.Hex("#1F4E79"), pad, iy, iw) + 6;
             }
             if (o.NewlyClearedTimes.Count > 0 && !C.CrimeTimeKnown)
             {
                 var hours = new List<string>();
                 foreach (var t in o.NewlyClearedTimes) hours.Add(C.Hours[t]);
-                iy += Panels.Paragraph(root, "Ora e krimit nuk mund të jetë më: " + string.Join(", ", hours.ToArray()) + ".", Theme.Sans, 15, Theme.Blue, pad, iy, iw) + 6;
+                iy += Panels.Paragraph(root, "Ora e krimit nuk mund të jetë më: " + string.Join(", ", hours.ToArray()) + ".", Theme.Sans, 15, Theme.Hex("#1F4E79"), pad, iy, iw) + 6;
             }
             if (o.Conflict != null)
             {
-                var box = UI.Card(root, "Conflict", Theme.WithAlpha(Theme.Red, 0.12f), Theme.WithAlpha(Theme.Red, 0.7f), 10);
-                var badge = UI.Panel(box.transform, "Icon", Theme.Red, 64, false);
+                var box = UI.Card(root, "Conflict", Theme.WithAlpha(Theme.Hex("#8E2C24"), 0.10f), Theme.WithAlpha(Theme.Hex("#8E2C24"), 0.55f), 10);
+                var badge = UI.Panel(box.transform, "Icon", Theme.Hex("#8E2C24"), 64, false);
                 UI.Place(badge.rectTransform, 12, 12, 24, 24);
-                var ex = UI.Label(badge.transform, "!", Theme.SansBold, 16, Theme.Night, TextAnchor.MiddleCenter);
+                var ex = UI.Label(badge.transform, "!", Theme.SansBold, 16, Theme.Parchment, TextAnchor.MiddleCenter);
                 UI.Stretch(ex.rectTransform, 0, 0, 0, 0);
-                UI.LabelAt(box.transform, "Kontradictë", Theme.SansBold, 15, Theme.RedText, 46, 12, iw - 60, 22);
-                float th = Panels.Paragraph(box.transform, S.ConflictText(o.Conflict), Theme.Sans, 14, Theme.Hex("#F1D6D0"), 46, 36, iw - 60);
+                UI.LabelAt(box.transform, "Kontradictë", Theme.SansBold, 15, Theme.Hex("#8E2C24"), 46, 12, iw - 60, 22);
+                float th = Panels.Paragraph(box.transform, S.ConflictText(o.Conflict), Theme.Sans, 14, Theme.ParchInk, 46, 36, iw - 60);
                 float bh = 36 + th + 12;
                 UI.Place(box.rectTransform, pad, iy, iw, bh);
                 iy += bh + 8;
@@ -272,16 +273,18 @@ namespace Alibi.Unity
 
         public float Dossier(RectTransform content, float y, float w)
         {
-            float iy = y;
-            var head = UI.Rect(content, "DossierHead");
-            UI.Place(head, 0, iy, w, 40);
-            UI.LabelAt(head, "Dosja e dëshmive", Theme.Serif, 30, Theme.Parchment, 4, 0, w - 160, 40);
-            UI.LabelAt(head, S.Statements.Count + (S.Statements.Count == 1 ? " deklaratë" : " deklarata"), Theme.Sans, 14, Theme.Muted, 0, 12, w - 4, 20, TextAnchor.UpperRight);
+            // E gjitha mbi një kartë pergamene, që titulli e dëshmitë të mos notojnë mbi skenën 3D.
+            var dcard = Panels.ParchmentCard(content, "Dossier");
+            var droot = dcard.transform;
+            float dpad = 18, dw = w - dpad * 2, iy = 16;
+            UI.LabelAt(droot, "Dosja e dëshmive", Theme.Serif, 30, Theme.ParchInk, dpad, iy, dw - 150, 40);
+            UI.LabelAt(droot, S.Statements.Count + (S.Statements.Count == 1 ? " deklaratë" : " deklarata"), Theme.Sans, 14, Theme.ParchMuted, dpad, iy + 12, dw, 20, TextAnchor.UpperRight);
             iy += 48;
             if (S.Statements.Count == 0)
             {
-                iy += Panels.Paragraph(content, "Ende asnjë deklaratë. Çdo përgjigje ruhet këtu vetë, pa shënime në letër.", Theme.Sans, 15, Theme.Muted, 4, iy, w - 8) + 10;
-                return iy - y;
+                iy += Panels.Paragraph(droot, "Ende asnjë deklaratë. Çdo përgjigje ruhet këtu vetë, pa shënime në letër.", Theme.Sans, 15, Theme.ParchMuted, dpad, iy, dw) + 10;
+                UI.Place(dcard.rectTransform, 0, y, w, iy + 8);
+                return iy + 8;
             }
             var lies = new HashSet<int>();
             if (S.IsOver) foreach (var l in S.Lies()) lies.Add(l.Id);
@@ -290,28 +293,29 @@ namespace Alibi.Unity
                 var st = S.Statements[i];
                 var sus = C.Suspects[st.Suspect];
                 bool flagged = S.Flagged.Contains(st.Id);
-                var card = UI.Card(content, "Statement", flagged ? Theme.WithAlpha(Theme.Red, 0.08f) : Theme.Hex("#161A22"), flagged ? Theme.WithAlpha(Theme.Red, 0.55f) : Theme.Line, 10);
+                var card = UI.Panel(droot, "Statement", flagged ? Theme.WithAlpha(Theme.Hex("#8E2C24"), 0.10f) : new Color(1f, 1f, 1f, 0.38f), 10, false);
+                UI.Border(card.transform, flagged ? Theme.WithAlpha(Theme.Hex("#8E2C24"), 0.55f) : Theme.WithAlpha(Theme.ParchInk, 0.22f), 10);
                 var root = card.transform;
-                float pad = 14, iw = w - pad * 2, cy = 10;
-                UI.LabelAt(root, "#" + st.Id, Theme.Mono, 13, Theme.Muted, pad, cy + 3, 40, 20);
+                float pad = 14, iw = dw - pad * 2, cy = 10;
+                UI.LabelAt(root, "#" + st.Id, Theme.Mono, 13, Theme.ParchMuted, pad, cy + 3, 40, 20);
                 UI.Avatar(root, sus, 24, pad + 36, cy);
-                UI.LabelAt(root, sus.Def, Theme.SansSemi, 15, Theme.Text, pad + 68, cy + 2, 140, 22);
-                UI.LabelAt(root, st.QuestionText, Theme.Sans, 13, Theme.Muted, pad + 160, cy + 4, iw - 160, 20);
+                UI.LabelAt(root, sus.Def, Theme.SansSemi, 15, Theme.ParchInk, pad + 68, cy + 2, 140, 22);
+                UI.LabelAt(root, st.QuestionText, Theme.Sans, 13, Theme.ParchMuted, pad + 160, cy + 4, iw - 160, 20);
                 cy += 32;
-                cy += Panels.Paragraph(root, "«" + st.Text + "»", Theme.SerifItalic, 21, Theme.Parchment, pad, cy, iw) + 2;
-                cy += Panels.Paragraph(root, st.Formal, Theme.Mono, 13, Theme.Hex("#C9A45C"), pad, cy, iw) + 6;
+                cy += Panels.Paragraph(root, "«" + st.Text + "»", Theme.SerifItalic, 21, Theme.ParchInk, pad, cy, iw) + 2;
+                cy += Panels.Paragraph(root, st.Formal, Theme.Mono, 13, Theme.Hex("#7A5A22"), pad, cy, iw) + 6;
                 var tags = new List<KeyValuePair<string, Color>>();
-                if (flagged) tags.Add(new KeyValuePair<string, Color>("Në kontradiktë", Theme.RedText));
-                if (S.IsOver && lies.Contains(st.Id)) tags.Add(new KeyValuePair<string, Color>("Gënjeshtër e fajtorit", Theme.RedText));
-                if (S.IsOver && st.IsMistake) tags.Add(new KeyValuePair<string, Color>("Gabim i pavullnetshëm (R05)", Theme.Hex("#E2C27A")));
-                if (S.IsCleared(st.Suspect)) tags.Add(new KeyValuePair<string, Color>("E vërtetuar", Theme.Blue));
-                else if (S.UnverifiedConfirmation(st)) tags.Add(new KeyValuePair<string, Color>("Konfirmim i paverifikuar", Theme.Text2));
-                else tags.Add(new KeyValuePair<string, Color>("E paverifikuar", Theme.Text2));
+                if (flagged) tags.Add(new KeyValuePair<string, Color>("Në kontradiktë", Theme.Hex("#8E2C24")));
+                if (S.IsOver && lies.Contains(st.Id)) tags.Add(new KeyValuePair<string, Color>("Gënjeshtër e fajtorit", Theme.Hex("#8E2C24")));
+                if (S.IsOver && st.IsMistake) tags.Add(new KeyValuePair<string, Color>("Gabim i pavullnetshëm (R05)", Theme.Hex("#7A5A22")));
+                if (S.IsCleared(st.Suspect)) tags.Add(new KeyValuePair<string, Color>("E vërtetuar", Theme.Hex("#1F4E79")));
+                else if (S.UnverifiedConfirmation(st)) tags.Add(new KeyValuePair<string, Color>("Konfirmim i paverifikuar", Theme.ParchMuted));
+                else tags.Add(new KeyValuePair<string, Color>("E paverifikuar", Theme.ParchMuted));
                 float x = pad;
                 foreach (var tag in tags)
                 {
                     float tw = UI.TextWidth(tag.Key, Theme.Sans, 12) + 20;
-                    var chip = UI.Card(root, "Tag", new Color(0, 0, 0, 0), Theme.WithAlpha(tag.Value, 0.6f), 12);
+                    var chip = UI.Card(root, "Tag", new Color(0.16f, 0.13f, 0.09f, 0.06f), Theme.WithAlpha(tag.Value, 0.6f), 12);
                     UI.Place(chip.rectTransform, x, cy, tw, 24);
                     var t = UI.Label(chip.transform, tag.Key, Theme.Sans, 12, tag.Value, TextAnchor.MiddleCenter);
                     UI.Stretch(t.rectTransform, 0, 0, 0, 0);
@@ -319,10 +323,12 @@ namespace Alibi.Unity
                     x += tw + 6;
                 }
                 cy += 34;
-                UI.Place(card.rectTransform, 0, iy, w, cy);
+                UI.Place(card.rectTransform, dpad, iy, dw, cy);
                 iy += cy + 8;
             }
-            return iy - y;
+            iy += 8;
+            UI.Place(dcard.rectTransform, 0, y, w, iy);
+            return iy;
         }
 
         string StatementLine(Statement st)

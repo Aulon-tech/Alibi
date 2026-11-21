@@ -878,6 +878,9 @@ namespace Alibi.Unity
         void BuildTabs()
         {
             UI.Clear(tabsRow);
+            // Shirit pergamene nën tabet, që teksti të lexohet mbi skenën 3D.
+            var tabsBg = Panels.ParchmentCard(tabsRow, "TabsBg");
+            UI.Stretch(tabsBg.rectTransform, 0, 0, 0, 0);
             string first = Session.IsOver ? "Rezultati" : "Marrja në pyetje";
             var a = UI.Button(tabsRow, first, tab == 0 ? BtnStyle.TabOn : BtnStyle.Tab, () => SetTab(0), 16, 10);
             UI.Place(a.Rect, 0, 0, 220, 44);

@@ -213,8 +213,8 @@ namespace Alibi.Unity
                 case BtnStyle.Dark: bg = Theme.ParchInk; border = Theme.ParchInk; text = Theme.Parchment; break;
                 case BtnStyle.Parchment: bg = Theme.ParchInk; border = Theme.ParchInk; text = Theme.Parchment; break;
                 case BtnStyle.ParchmentGhost: bg = new Color(0, 0, 0, 0); border = Theme.WithAlpha(Theme.ParchInk, 0.45f); text = Theme.ParchInk; break;
-                case BtnStyle.Tab: bg = new Color(0, 0, 0, 0); border = new Color(0, 0, 0, 0); text = Theme.Muted; break;
-                case BtnStyle.TabOn: bg = Theme.Panel2; border = Theme.Line2; text = Theme.GoldText; break;
+                case BtnStyle.Tab: bg = new Color(0, 0, 0, 0); border = new Color(0, 0, 0, 0); text = Theme.ParchMuted; break;
+                case BtnStyle.TabOn: bg = new Color(0.16f, 0.13f, 0.09f, 0.14f); border = Theme.Hex("#7A5A22"); text = Theme.ParchInk; break;
                 default: bg = Theme.Panel2; border = Theme.Line2; text = Theme.Text; break;
             }
         }
