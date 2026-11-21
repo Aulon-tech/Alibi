@@ -361,6 +361,19 @@ namespace Alibi.Unity
                 // Add role-specific props on top
                 RoleLook.Attach(visual.transform, info.Id, kit);
 
+                // --- KLIKIMI: hap panelin e pyetjeve (më parë e bënte SuspectMarker) ---
+                var clickGo = new GameObject("ClickTarget");
+                clickGo.transform.SetParent(visual.transform, false);
+                clickGo.transform.localPosition = new Vector3(0f, 0.95f, 0f);
+                var cap = clickGo.AddComponent<CapsuleCollider>();
+                cap.radius = 0.38f;
+                cap.height = 1.9f;
+                int si = s;
+                clickGo.AddComponent<ClickRelay>().OnClick = () =>
+                {
+                    if (view.SuspectClicked != null) view.SuspectClicked(si);
+                };
+
                 // --- POINT LIGHT per figure: real 3D shading in dark rooms ---
                 var lightGo = new GameObject("FigureLight");
                 lightGo.transform.SetParent(go.transform, false);
@@ -678,12 +691,6 @@ namespace Alibi.Unity
                 Cyl("ClockFace", kit.Glow("#F0E6C8", 0.8f), u, v, y0 + 0.016f, 0.18f, 0.005f, false);
             }
 
-            void WallMirror(float u, float v, float y0, float sx, float sy)
-            {
-                Cube("MirrorFrame", M("#B8923F", 0.5f), u, v, y0, sx + 0.04f, sy + 0.04f, 0.02f, false);
-                Cube("MirrorGlass", M("#A8B8C8", 0.9f), u, v, y0 + 0.01f, sx, sy, 0.01f, false);
-            }
-
             // Curtain pair flanking a window position
             void Curtains(float u, float v, float sx, string hex)
             {
@@ -767,11 +774,8 @@ namespace Alibi.Unity
             {
                 CeilingFixture("chandelier");
                 Rug(2.0f, 1.5f, 1.8f, 1.1f, "#6E2F37");
-                // Console table with vase and key bowl
-                Cube("Console", M("#5B3F2A"), 2.0f, 0.22f, 0f, 1.0f, 0.42f, 0.26f);
-                Cyl("Vase", M("#B8923F", 0.5f), 2.0f, 0.22f, 0.42f, 0.12f, 0.18f, false);
-                Cyl("KeyBowl", M("#B8923F", 0.5f), 2.3f, 0.22f, 0.42f, 0.14f, 0.04f, false);
-                SmallPlant(1.7f, 0.22f, 0.42f);
+                // Hyrja mbetet e lirë: konsolla, vazoja, kupa e çelësave dhe pasqyra u hoqën
+                // sepse binin pikërisht para derës së hyrjes.
                 // Large potted plants
                 Plant(0.3f, 0.3f);
                 Plant(3.7f, 0.3f);
@@ -781,8 +785,6 @@ namespace Alibi.Unity
                 Cyl("UmbrellaStand", M("#4A3828"), 3.5f, 2.7f, 0f, 0.18f, 0.35f);
                 // Floor lamp
                 FloorLamp(0.3f, 2.7f);
-                // Wall mirror above console
-                WallMirror(2.0f, 0.08f, 0.6f, 0.5f, 0.35f);
                 // Hall paintings
                 WallPainting(0.6f, 0.08f, 0.55f, 0.3f, 0.22f, "#5B3F2A", "#2A3A4A");
                 WallPainting(3.4f, 0.08f, 0.5f, 0.25f, 0.2f, "#B8923F", "#3A2E1E");
