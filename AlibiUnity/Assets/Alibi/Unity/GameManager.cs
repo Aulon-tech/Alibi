@@ -291,6 +291,7 @@ namespace Alibi.Unity
             host.pivot = new Vector2(0, 0);
             host.anchoredPosition = new Vector2(14, 14);
             host.sizeDelta = new Vector2(400, 40);
+            FTUEController.Register("cam_controls", host);
 
             bool isFP = rig != null && rig.Mode == CameraMode.FirstPerson;
             bool isTP = rig != null && rig.Mode == CameraMode.ThirdPerson;
@@ -315,6 +316,7 @@ namespace Alibi.Unity
                 if (wasTopDown) SetCeilingsVisible(true);
                 // Show/hide player body
                 if (playerBody != null) playerBody.gameObject.SetActive(rig.Mode != CameraMode.FirstPerson);
+                FTUEController.NotifyAction("camera_switched");
                 BuildCameraControls();
             }, 14, 8);
             togglePerson.Background.color = new Color(0.05f, 0.06f, 0.08f, 0.8f);
@@ -336,6 +338,7 @@ namespace Alibi.Unity
                     if (playerBody != null) playerBody.gameObject.SetActive(true);
                     SetCeilingsVisible(true);
                 }
+                FTUEController.NotifyAction("camera_switched");
                 BuildCameraControls();
             }, 14, 8);
             overviewBtn.Background.color = new Color(0.05f, 0.06f, 0.08f, 0.8f);
@@ -355,6 +358,9 @@ namespace Alibi.Unity
         // ==================== INPUT ====================
         void HandleInput()
         {
+            // FTUE: disabled bashke me FTUE-ne
+            // if (FTUEController.BlockWorldInput) return;
+
             bool tabDown = false;
             bool eDown = false;
             bool escDown = false;
@@ -398,6 +404,7 @@ namespace Alibi.Unity
             minimapHost.pivot = new Vector2(0, 0);
             minimapHost.anchoredPosition = new Vector2(14, 94);
             minimapHost.sizeDelta = new Vector2(mapW, mapH);
+            FTUEController.Register("hud_minimap", minimapHost);
 
             // Black background with grey border
             var bg = minimapHost.gameObject.AddComponent<UnityEngine.UI.Image>();
@@ -720,14 +727,17 @@ namespace Alibi.Unity
             var accuse = UI.Button(barHost, "Akuzo", Session.IsOver ? BtnStyle.Disabled : BtnStyle.Danger, OpenAccusation, 14, 8);
             UI.PlaceRight(accuse.Rect, r, 6, 90, 40);
             accuse.SetInteractable(!Session.IsOver);
+            FTUEController.Register("topbar_accuse", accuse.Rect);
             r += 96;
             var howto = UI.Button(barHost, "?", BtnStyle.Ghost, ShowHowTo, 14, 8);
             UI.PlaceRight(howto.Rect, r, 6, 36, 40);
+            FTUEController.Register("topbar_help", howto.Rect);
             r += 42;
             if (caseDef.Tutorial.Count > 0)
             {
                 var tut = UI.Button(barHost, tutorialVisible ? "Udh: ON" : "Udh: OFF", tutorialVisible ? BtnStyle.ChipOn : BtnStyle.Ghost, ToggleTutorial, 12, 8);
                 UI.PlaceRight(tut.Rect, r, 6, 90, 40);
+                FTUEController.Register("topbar_guide_toggle", tut.Rect);
                 r += 96;
             }
 
@@ -735,6 +745,7 @@ namespace Alibi.Unity
             int remaining = Mathf.Max(0, Session.Remaining);
             var count = UI.LabelAt(barHost, remaining + "/" + caseDef.Budget, Theme.Mono, 14, Theme.Text, 0, 0, 50, BarH, TextAnchor.MiddleRight);
             UI.PlaceRight(count.rectTransform, r, 0, 50, BarH);
+            FTUEController.Register("topbar_budget", count.rectTransform);
             r += 54;
             float pipW = 7, pipGap = 2;
             for (int i = 0; i < caseDef.Budget; i++)
@@ -756,6 +767,7 @@ namespace Alibi.Unity
             UI.Place(chip.rectTransform, 14, BarH + 14, w, 58);
             UI.LabelAt(chip.transform, title, Theme.Mono, 13, Theme.Gold, 14, 10, w, 18).horizontalOverflow = HorizontalWrapMode.Overflow;
             UI.LabelAt(chip.transform, sub, Theme.Sans, 14, Theme.Text2, 14, 31, w, 20).horizontalOverflow = HorizontalWrapMode.Overflow;
+            FTUEController.Register("hud_title_chip", chip.rectTransform);
 
             // Crime room pill
             string crime = caseDef.Rooms[caseDef.CrimeRoom].Name + " · " + (caseDef.CrimeTimeKnown ? caseDef.Hours[caseDef.CrimeTime] : "ora ?");
@@ -765,6 +777,7 @@ namespace Alibi.Unity
             var pt = UI.Label(pill.transform, crime, Theme.SansSemi, 13, Theme.RedText, TextAnchor.MiddleCenter);
             UI.Stretch(pt.rectTransform, 0, 0, 0, 0);
             pt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            FTUEController.Register("hud_crime_pill", pill.rectTransform);
 
             // Butoni per deduksion (zevendeson Tab hint tekstin)
             string tabLabel = showDeduction ? "Fshih deduksionin" : "Hap deduksionin";
@@ -773,6 +786,7 @@ namespace Alibi.Unity
             tabBtn.Rect.pivot = new Vector2(0, 0);
             tabBtn.Rect.anchoredPosition = new Vector2(14, 60);
             tabBtn.Rect.sizeDelta = new Vector2(180, 34);
+            FTUEController.Register("hud_tab_hint", tabBtn.Rect);
         }
 
         void BuildRoomCard()
@@ -888,6 +902,7 @@ namespace Alibi.Unity
             string second = "Dosja e dëshmive (" + Session.Statements.Count + ")" + (flagged > 0 && !Session.IsOver ? "  <color=#F09A8F>!</color>" : "");
             var b = UI.Button(tabsRow, second, tab == 1 ? BtnStyle.TabOn : BtnStyle.Tab, () => SetTab(1), 16, 10);
             UI.Place(b.Rect, 228, 0, 280, 44);
+            FTUEController.Register("panel_evidence_tab", b.Rect);
         }
 
         void SetTab(int t)
@@ -1105,6 +1120,7 @@ namespace Alibi.Unity
             selectedRoom = selectedRoom == r ? -1 : r;
             villa.SelectRoom(selectedRoom);
             BuildRoomCard();
+            if (r >= 0) FTUEController.NotifyAction("room_clicked");
         }
 
         void ShowOverlay(int kind)
@@ -1148,6 +1164,8 @@ namespace Alibi.Unity
             Session.Begin();
             CloseOverlay();
             RefreshAll();
+            // FTUE: disabled — vizualisht i thyer (magenta), duhet fix ne FTUEController para ri-aktivizimit
+            // if (caseDef.CardNumber == 1) FTUEController.StartCard1(null);
         }
 
         public void OpenAccusation()

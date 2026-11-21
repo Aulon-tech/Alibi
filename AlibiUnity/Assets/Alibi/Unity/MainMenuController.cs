@@ -467,6 +467,8 @@ namespace Alibi.Unity
                 float cx = startX + i * (cardW + gap);
                 BuildLevelCard(bgR, cx, 0.44f, cardW, cardH, names[i], i + 1);
             }
+            // FTUE: disabled — vizualisht i thyer (magenta), duhet fix ne FTUEController para ri-aktivizimit
+            // FTUEController.StartMenu(null);
 
             // Buton mbyll (X)
             var xGo = new GameObject("close_btn");
@@ -581,6 +583,8 @@ namespace Alibi.Unity
 
             int c = card;
             btn.onClick.AddListener(() => StartCard(c));
+            // FTUE: regjistro karten e pare per spotlight
+            if (card == 1) FTUEController.Register("menu_card1", rt);
         }
 
         // «Rast i ri»: rast i gjeneruar ne nivelin ku ka arritur lojtari. Nese gjeneruesi
@@ -609,15 +613,14 @@ namespace Alibi.Unity
         // prandaj çdo kartë hapte Karten 1.
         void StartCard(int card)
         {
+            FTUEController.NotifyAction("card1_clicked");
             PlayerPrefs.SetInt("alibi_card", card);
             PlayerPrefs.DeleteKey("alibi_newcase");
 
-            // Nese karta ka rregulla te reja dhe nuk eshte pare ende, trego tutorialin
-            string tutKey = "alibi_card_tut_" + card;
-            if (card >= 2 && PlayerPrefs.GetInt(tutKey, 0) == 0)
+            // Trego tutorialin per cdo karte >= 2 (cdo here, deri ne versionin final)
+            // TODO: ri-aktivizo check-in "nuk eshte pare ende" kur versioni final
+            if (card >= 2)
             {
-                PlayerPrefs.SetInt(tutKey, 1);
-                PlayerPrefs.Save();
                 var tutGo = new GameObject("_CardTutorial");
                 tutGo.transform.SetParent(_canvas.transform, false);
                 var tut = tutGo.AddComponent<TutorialSystem>();
