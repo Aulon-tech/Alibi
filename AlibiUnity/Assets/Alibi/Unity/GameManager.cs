@@ -7,8 +7,9 @@ namespace Alibi.Unity
 {
     public sealed class GameManager : MonoBehaviour
     {
-        const float BarH = 76f;
-        const float RightW = 700f;
+        const float BarH = 52f;
+        const float ProximityRange = 5f;
+        const float ProximityInterval = 0.15f;
 
         public GameSession Session { get; private set; }
         public Question Draft = new Question();
@@ -19,20 +20,42 @@ namespace Alibi.Unity
         CaseDefinition caseDef;
         CameraRig rig;
         VillaView villa;
-        ScreenLabels labels;
+        // ScreenLabels labels;  // REMOVED — floating neon letters disabled
         PropagationAnimator animator;
         Canvas canvas;
-        RectTransform overlayRoot, rightContent, tabsRow, villaFrame, roomCardHost, hudHost, barHost, cameraControlsHost;
+
+        // --- immersive UI ---
+        RectTransform overlayRoot, villaFrame, roomCardHost, hudHost, barHost, cameraControlsHost;
+        RectTransform deductionPanel;       // toggled with Tab
+        RectTransform rightOverlayRoot;     // suspect interaction panel (right side)
+        RectTransform rightContent, tabsRow;
         ScrollRect rightScroll;
+        RectTransform promptHost;           // bottom-center "Press E" prompt
+
         DeductionBoardView board;
         TimelineController timeline;
         InterrogationPanel interrogation;
         GamePanels panels;
         ProgressiveRules progressiveRules;
+
         int currentTime;
         int selectedRoom = -1;
         int tab;
         bool tutorialVisible;
+
+        // --- immersive state ---
+        bool showDeduction;
+        bool showRight;
+        int nearSuspect = -1;
+        float proximityTimer;
+        Transform playerBody;
+
+        // --- minimap ---
+        RectTransform minimapHost;
+        RectTransform minimapDot;
+
+        // --- ceiling hiding for top-down view ---
+        List<GameObject> ceilingObjects;
 
         public Transform CanvasTransform { get { return canvas != null ? canvas.transform : null; } }
 
@@ -51,13 +74,37 @@ namespace Alibi.Unity
         void Update()
         {
             if (progressiveRules != null) progressiveRules.Update();
+            HandleInput();
+            proximityTimer -= Time.deltaTime;
+            if (proximityTimer <= 0f)
+            {
+                proximityTimer = ProximityInterval;
+                UpdateProximity();
+            }
+            UpdateMinimap();
         }
 
+        // ==================== WORLD ====================
         void BuildWorld()
         {
             villa = MapBuilder.Build(transform, caseDef);
             HouseDressing.Build(villa);
-            HouseDressing.SetResidentsMode(villa, ResidentsMode.Auto); // banori fshihet kur tabela e shfaq vetë atë të dyshuar
+            HouseDressing.SetResidentsMode(villa, ResidentsMode.Always);
+
+            // Fully deactivate SuspectMarker GameObjects (capsule body, sphere head, neon dashed ring)
+            // Only the ResidentFigure 3D meshes from HouseDressing remain visible
+            if (villa.Markers != null)
+            {
+                int sn = villa.Case.N, rc = villa.Case.RoomCount;
+                for (int s = 0; s < sn; s++)
+                    for (int r = 0; r < rc; r++)
+                    {
+                        var m = villa.Markers[s, r];
+                        if (m == null) continue;
+                        m.gameObject.SetActive(false);
+                    }
+            }
+
             SceneSetup.Lights(transform, villa.Bounds);
             rig = CameraRig.Create(transform, Theme.Night);
             rig.Target = villa.Bounds;
@@ -67,47 +114,88 @@ namespace Alibi.Unity
             villa.SuspectClicked = s =>
             {
                 tab = 0;
-                SelectSuspect(s);
+                InteractWithSuspect(s);
             };
             AlibiFlow.DisableForeignCamerasAndLights(transform);
             animator = gameObject.AddComponent<PropagationAnimator>();
+
+            // --- start in first person inside the hall ---
+            RoomLayout hallLayout = default;
+            bool foundHall = false;
+            foreach (var kv in villa.Rooms)
+            {
+                if (kv.Value.Info.Id == "HO") { hallLayout = kv.Value.Layout; foundHall = true; break; }
+            }
+            if (foundHall)
+            {
+                rig.EnterFirstPerson(hallLayout.Center);
+            }
+            else
+            {
+                rig.SetMode(CameraMode.FirstPerson);
+            }
+
+            BuildPlayerBody();
         }
 
+        void BuildPlayerBody()
+        {
+            var go = new GameObject("PlayerBody");
+            go.transform.SetParent(transform, false);
+            playerBody = go.transform;
+            var dark = Theme.Lit(new Color(0.12f, 0.14f, 0.18f), 0.3f);
+
+            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            body.name = "Body";
+            body.transform.SetParent(go.transform, false);
+            body.transform.localPosition = new Vector3(0, 0.72f, 0);
+            body.transform.localScale = new Vector3(0.42f, 0.72f, 0.42f);
+            body.GetComponent<Renderer>().sharedMaterial = dark;
+            var bc = body.GetComponent<Collider>();
+            if (bc != null) Object.Destroy(bc);
+
+            var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            head.name = "Head";
+            head.transform.SetParent(go.transform, false);
+            head.transform.localPosition = new Vector3(0, 1.58f, 0);
+            head.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
+            head.GetComponent<Renderer>().sharedMaterial = dark;
+            var hc = head.GetComponent<Collider>();
+            if (hc != null) Object.Destroy(hc);
+
+            rig.PlayerBody = playerBody;
+
+            // first-person: hide the body
+            go.SetActive(rig.Mode != CameraMode.FirstPerson);
+        }
+
+        void CacheCeilings()
+        {
+            if (ceilingObjects != null) return;
+            ceilingObjects = new List<GameObject>();
+            if (villa == null) return;
+            foreach (var t in villa.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name == "Ceiling") ceilingObjects.Add(t.gameObject);
+            }
+        }
+
+        void SetCeilingsVisible(bool visible)
+        {
+            CacheCeilings();
+            foreach (var c in ceilingObjects)
+                if (c != null) c.SetActive(visible);
+        }
+
+        // ==================== UI ====================
         void BuildUI()
         {
             canvas = AlibiFlow.CreateCanvas(transform, "GameCanvas", 10);
             var root = (RectTransform)canvas.transform;
 
-            var labelLayer = UI.Rect(root, "VillaLabels");
-            UI.Stretch(labelLayer, 0, 0, 0, 0);
-
-            var left = UI.Rect(root, "LeftColumn");
-            left.anchorMin = Vector2.zero;
-            left.anchorMax = Vector2.one;
-            left.offsetMin = new Vector2(16, 16);
-            left.offsetMax = new Vector2(-(RightW + 32), -(BarH + 12));
-            float boardH = DeductionBoardView.PreferredHeight(caseDef);
-
-            var boardRt = UI.Rect(left, "Board");
-            UI.StretchBottom(boardRt, 0, 0, 0, boardH);
-            board = gameObject.AddComponent<DeductionBoardView>();
-            board.Animator = animator;
-            board.OnHourClicked = t => SetTime(t);
-            board.OnSuspectClicked = s =>
-            {
-                tab = 0;
-                SelectSuspect(s);
-            };
-
-            var tlRt = UI.Rect(left, "Timeline");
-            UI.StretchBottom(tlRt, 0, boardH + 12, 0, 56);
-            timeline = gameObject.AddComponent<TimelineController>();
-            timeline.Build(tlRt, caseDef);
-            timeline.OnTimeChanged = t => SetTime(t);
-
-            villaFrame = UI.Rect(left, "VillaFrame");
-            UI.Stretch(villaFrame, 0, 0, 0, boardH + 12 + 56 + 12);
-            UI.Border(villaFrame, Theme.Line, 14);
+            // === VILLA FRAME = FULL SCREEN ===
+            villaFrame = UI.Rect(root, "VillaFrame");
+            UI.Stretch(villaFrame, 0, 0, 0, 0);
             hudHost = UI.Rect(villaFrame, "Hud");
             UI.Stretch(hudHost, 0, 0, 0, 0);
             roomCardHost = UI.Rect(villaFrame, "RoomCard");
@@ -115,29 +203,66 @@ namespace Alibi.Unity
             BuildCameraControls();
             rig.Frame = villaFrame;
 
-            labels = gameObject.AddComponent<ScreenLabels>();
-            labels.View = villa;
-            labels.Cam = rig.Cam;
-            labels.Layer = labelLayer;
-            labels.Clip = villaFrame;
-            labels.Build();
+            // ScreenLabels REMOVED — floating neon letter labels disabled
+            // Name labels above suspects are shown via proximity (see UpdateProximity)
 
-            var right = UI.Rect(root, "RightColumn");
-            right.anchorMin = new Vector2(1, 0);
-            right.anchorMax = new Vector2(1, 1);
-            right.pivot = new Vector2(1, 0.5f);
-            right.offsetMin = new Vector2(-(RightW + 16), 16);
-            right.offsetMax = new Vector2(-16, -(BarH + 12));
-            tabsRow = UI.Rect(right, "Tabs");
-            UI.StretchTop(tabsRow, 0, 0, 0, 44);
-            rightScroll = UI.Scroll(right, "RightScroll", out rightContent);
-            UI.Stretch((RectTransform)rightScroll.transform, 0, 54, 0, 0);
-
+            // === FLOATING TOP BAR ===
             barHost = UI.Rect(root, "TopBar");
             UI.StretchTop(barHost, 0, 0, 0, BarH);
 
+            // === DEDUCTION PANEL (toggled with Tab, left side overlay) ===
+            deductionPanel = UI.Rect(root, "DeductionPanel");
+            deductionPanel.anchorMin = Vector2.zero;
+            deductionPanel.anchorMax = new Vector2(0.55f, 1f);
+            deductionPanel.offsetMin = new Vector2(16, 16);
+            deductionPanel.offsetMax = new Vector2(-16, -(BarH + 12));
+            deductionPanel.gameObject.SetActive(false);
+
+            float boardH = DeductionBoardView.PreferredHeight(caseDef);
+            var boardRt = UI.Rect(deductionPanel, "Board");
+            UI.StretchBottom(boardRt, 0, 0, 0, boardH);
+            board = gameObject.AddComponent<DeductionBoardView>();
+            board.Animator = animator;
+            board.OnHourClicked = t => SetTime(t);
+            board.OnSuspectClicked = s =>
+            {
+                tab = 0;
+                InteractWithSuspect(s);
+            };
+
+            var tlRt = UI.Rect(deductionPanel, "Timeline");
+            UI.StretchBottom(tlRt, 0, boardH + 12, 0, 56);
+            timeline = gameObject.AddComponent<TimelineController>();
+            timeline.Build(tlRt, caseDef);
+            timeline.OnTimeChanged = t => SetTime(t);
+
             board.Build(boardRt, new GameSession(caseDef), villa);
 
+            // === RIGHT OVERLAY (suspect interaction) ===
+            rightOverlayRoot = UI.Rect(root, "RightOverlay");
+            rightOverlayRoot.anchorMin = new Vector2(0.6f, 0);
+            rightOverlayRoot.anchorMax = new Vector2(1, 1);
+            rightOverlayRoot.offsetMin = new Vector2(0, 16);
+            rightOverlayRoot.offsetMax = new Vector2(-16, -(BarH + 12));
+            rightOverlayRoot.gameObject.SetActive(false);
+
+            tabsRow = UI.Rect(rightOverlayRoot, "Tabs");
+            UI.StretchTop(tabsRow, 0, 0, 0, 44);
+            rightScroll = UI.Scroll(rightOverlayRoot, "RightScroll", out rightContent);
+            UI.Stretch((RectTransform)rightScroll.transform, 0, 54, 0, 0);
+
+            // === PROMPT HOST (bottom center) ===
+            promptHost = UI.Rect(root, "PromptHost");
+            promptHost.anchorMin = new Vector2(0.3f, 0);
+            promptHost.anchorMax = new Vector2(0.7f, 0);
+            promptHost.pivot = new Vector2(0.5f, 0);
+            promptHost.anchoredPosition = new Vector2(0, 80);
+            promptHost.sizeDelta = new Vector2(0, 50);
+
+            // === MINIMAP (bottom-right) ===
+            BuildMinimap(root);
+
+            // === OVERLAYS (modals) ===
             overlayRoot = UI.Rect(root, "Overlays");
             UI.Stretch(overlayRoot, 0, 0, 0, 0);
 
@@ -154,38 +279,371 @@ namespace Alibi.Unity
             host.anchorMin = host.anchorMax = new Vector2(0, 0);
             host.pivot = new Vector2(0, 0);
             host.anchoredPosition = new Vector2(14, 14);
-            host.sizeDelta = new Vector2(560, 40);
-            bool fp = rig != null && rig.Mode == CameraMode.FirstPerson;
-            string fpLabel = fp ? "Pamje nga lart" : "Pamje e parë";
-            string[] labelsTxt = { "‹", "›", "+", "–", "Qendër", fpLabel };
+            host.sizeDelta = new Vector2(400, 40);
+
+            bool isFP = rig != null && rig.Mode == CameraMode.FirstPerson;
+            bool isTP = rig != null && rig.Mode == CameraMode.ThirdPerson;
+            bool isOV = rig != null && rig.Mode == CameraMode.Overview;
+            bool isTopDown = rig != null && rig.Mode == CameraMode.TopDown;
+
             float x = 0;
-            for (int i = 0; i < labelsTxt.Length; i++)
+
+            // Person view toggle: FirstPerson <-> ThirdPerson
+            string personLabel = isFP ? "Pamje e tretë" : "Pamje e parë";
+            var togglePerson = UI.Button(host, personLabel, isFP ? BtnStyle.ChipOn : (isTP ? BtnStyle.ChipOn : BtnStyle.Ghost), () =>
             {
-                int k = i;
-                float w = i == 4 ? 86 : i == 5 ? 130 : 40;
-                var b = UI.Button(host, labelsTxt[i], k == 5 && fp ? BtnStyle.ChipOn : BtnStyle.Ghost, () =>
+                bool wasTopDown = rig.Mode == CameraMode.TopDown;
+                if (rig.Mode == CameraMode.FirstPerson || rig.Mode == CameraMode.ThirdPerson)
                 {
-                    if (k == 0) rig.RotateStep(-1);
-                    else if (k == 1) rig.RotateStep(1);
-                    else if (k == 2) rig.ZoomBy(1.15f);
-                    else if (k == 3) rig.ZoomBy(1f / 1.15f);
-                    else if (k == 4) { rig.ResetView(); BuildCameraControls(); }
-                    else
-                    {
-                        if (rig.Mode == CameraMode.FirstPerson) rig.ExitFirstPerson();
-                        else rig.SetMode(CameraMode.FirstPerson);
-                        BuildCameraControls();
-                    }
-                }, k == 5 ? 14 : (k == 4 ? 14 : 20), 8);
-                b.Background.color = new Color(0.05f, 0.06f, 0.08f, 0.8f);
-                UI.Place(b.Rect, x, 0, w, 40);
-                x += w + 6;
-            }
-            string hint1 = fp ? "WASD lëviz · miu kthehet · Space/Shift lart/poshtë" : "Kliko një dhomë ose një figurë · rrota e miut zmadhon";
-            var hint = UI.LabelAt(host, hint1, Theme.Sans, 12, Theme.Muted, x + 6, 0, 420, 40, TextAnchor.MiddleLeft);
+                    rig.TogglePersonView();
+                }
+                else
+                {
+                    rig.SetMode(CameraMode.FirstPerson);
+                }
+                if (wasTopDown) SetCeilingsVisible(true);
+                // Show/hide player body
+                if (playerBody != null) playerBody.gameObject.SetActive(rig.Mode != CameraMode.FirstPerson);
+                BuildCameraControls();
+            }, 14, 8);
+            togglePerson.Background.color = new Color(0.05f, 0.06f, 0.08f, 0.8f);
+            UI.Place(togglePerson.Rect, x, 0, 140, 40);
+            x += 146;
+
+            // Top-down player-tracking overhead view
+            var overviewBtn = UI.Button(host, "Pamje nga lart", isTopDown ? BtnStyle.ChipOn : BtnStyle.Ghost, () =>
+            {
+                if (rig.Mode == CameraMode.TopDown)
+                {
+                    rig.SetMode(CameraMode.FirstPerson);
+                    if (playerBody != null) playerBody.gameObject.SetActive(false);
+                    SetCeilingsVisible(true);
+                }
+                else
+                {
+                    rig.SetMode(CameraMode.TopDown);
+                    if (playerBody != null) playerBody.gameObject.SetActive(true);
+                    SetCeilingsVisible(false);
+                }
+                BuildCameraControls();
+            }, 14, 8);
+            overviewBtn.Background.color = new Color(0.05f, 0.06f, 0.08f, 0.8f);
+            UI.Place(overviewBtn.Rect, x, 0, 140, 40);
+            x += 146;
+
+            // Hint text
+            string hint1;
+            if (isFP || isTP || isTopDown)
+                hint1 = "W/S ec · A/D kthehu · Tab deduksion · E pyet";
+            else
+                hint1 = "Kliko një dhomë ose një figurë";
+            var hint = UI.LabelAt(host, hint1, Theme.Sans, 11, Theme.Muted, x + 6, 0, 350, 40, TextAnchor.MiddleLeft);
             hint.horizontalOverflow = HorizontalWrapMode.Overflow;
         }
 
+        // ==================== INPUT ====================
+        void HandleInput()
+        {
+            bool tabDown = false;
+            bool eDown = false;
+            bool escDown = false;
+
+#if ENABLE_INPUT_SYSTEM
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb != null)
+            {
+                tabDown = kb.tabKey.wasPressedThisFrame;
+                eDown = kb.eKey.wasPressedThisFrame;
+                escDown = kb.escapeKey.wasPressedThisFrame;
+            }
+#else
+            tabDown = Input.GetKeyDown(KeyCode.Tab);
+            eDown = Input.GetKeyDown(KeyCode.E);
+            escDown = Input.GetKeyDown(KeyCode.Escape);
+#endif
+            if (escDown)
+            {
+                if (showRight) { ToggleRight(false); return; }
+                if (showDeduction) { ToggleDeduction(); return; }
+            }
+            if (tabDown)
+            {
+                ToggleDeduction();
+            }
+            if (eDown && nearSuspect >= 0 && !Session.IsOver)
+            {
+                InteractWithSuspect(nearSuspect);
+            }
+        }
+
+        // ==================== MINIMAP ====================
+        void BuildMinimap(RectTransform root)
+        {
+            const float mapW = 150f, mapH = 120f;
+            minimapHost = UI.Rect(root, "Minimap");
+            // anchor bottom-left, above camera controls
+            minimapHost.anchorMin = new Vector2(0, 0);
+            minimapHost.anchorMax = new Vector2(0, 0);
+            minimapHost.pivot = new Vector2(0, 0);
+            minimapHost.anchoredPosition = new Vector2(14, 94);
+            minimapHost.sizeDelta = new Vector2(mapW, mapH);
+
+            // Black background with grey border
+            var bg = minimapHost.gameObject.AddComponent<UnityEngine.UI.Image>();
+            bg.color = new Color(0.02f, 0.02f, 0.04f, 0.85f);
+            var outline = minimapHost.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            outline.effectColor = new Color(0.35f, 0.35f, 0.38f, 0.9f);
+            outline.effectDistance = new Vector2(1, 1);
+
+            // Calculate world bounds for all rooms
+            float wMin = float.MaxValue, wMax = float.MinValue;
+            float zMin = float.MaxValue, zMax = float.MinValue;
+            foreach (var l in MapBuilder.Layouts)
+            {
+                if (l.X0 < wMin) wMin = l.X0;
+                if (l.X1 > wMax) wMax = l.X1;
+                if (l.Z0 < zMin) zMin = l.Z0;
+                if (l.Z1 > zMax) zMax = l.Z1;
+            }
+            float worldW = wMax - wMin;
+            float worldD = zMax - zMin;
+            float pad = 4f;
+            float drawW = mapW - pad * 2;
+            float drawH = mapH - pad * 2;
+            float scale = Mathf.Min(drawW / worldW, drawH / worldD);
+
+            // Draw each room as an outlined rectangle
+            foreach (var l in MapBuilder.Layouts)
+            {
+                float rx = pad + (l.X0 - wMin) * scale;
+                float ry = pad + (l.Z0 - zMin) * scale;
+                float rw = (l.X1 - l.X0) * scale;
+                float rh = (l.Z1 - l.Z0) * scale;
+
+                var room = UI.Rect(minimapHost, "MR_" + l.Id);
+                room.anchorMin = Vector2.zero;
+                room.anchorMax = Vector2.zero;
+                room.pivot = Vector2.zero;
+                room.anchoredPosition = new Vector2(rx, ry);
+                room.sizeDelta = new Vector2(rw, rh);
+                var roomImg = room.gameObject.AddComponent<UnityEngine.UI.Image>();
+                roomImg.color = new Color(0.08f, 0.08f, 0.1f, 1f);
+                var roomOutline = room.gameObject.AddComponent<UnityEngine.UI.Outline>();
+
+                // Grey outlines — slightly different tint per floor
+                if (l.Y > 1f)
+                {
+                    roomOutline.effectColor = new Color(0.45f, 0.45f, 0.5f, 0.7f); // upper floor — lighter grey
+                }
+                else if (l.Y < -1f)
+                {
+                    roomOutline.effectColor = new Color(0.3f, 0.3f, 0.33f, 0.5f); // basement — dim grey
+                }
+                else
+                {
+                    roomOutline.effectColor = new Color(0.4f, 0.4f, 0.42f, 0.9f); // ground floor — standard grey
+                }
+                roomOutline.effectDistance = new Vector2(1, 1);
+
+                // Room label
+                var lbl = UI.Label(room, l.Id, Theme.Mono, 8,
+                    new Color(0.55f, 0.55f, 0.5f, 0.7f), TextAnchor.MiddleCenter);
+                UI.Stretch(lbl.rectTransform, 0, 0, 0, 0);
+            }
+
+            // Draw door connections as thin lines between rooms
+            foreach (var d in MapBuilder.Doors)
+            {
+                RoomLayout a = default, b = default;
+                bool fa = false, fb = false;
+                foreach (var l in MapBuilder.Layouts)
+                {
+                    if (l.Id == d.A) { a = l; fa = true; }
+                    if (l.Id == d.B) { b = l; fb = true; }
+                }
+                if (!fa || !fb) continue;
+
+                // Calculate center of each room on minimap
+                float ax = pad + ((a.X0 + a.X1) * 0.5f - wMin) * scale;
+                float ay = pad + ((a.Z0 + a.Z1) * 0.5f - zMin) * scale;
+                float bx = pad + ((b.X0 + b.X1) * 0.5f - wMin) * scale;
+                float by = pad + ((b.Z0 + b.Z1) * 0.5f - zMin) * scale;
+
+                // Find the edge midpoint between the two rooms (not full center-to-center)
+                // Use the door position to draw a short connector at the shared wall
+                float cx = (ax + bx) * 0.5f;
+                float cy = (ay + by) * 0.5f;
+                float dx = bx - ax;
+                float dy = by - ay;
+                float len = Mathf.Sqrt(dx * dx + dy * dy);
+                float angle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+
+                // Short connecting line (8px long, 2px wide)
+                float lineLen = Mathf.Min(len * 0.4f, 8f);
+                var line = UI.Rect(minimapHost, "Door_" + d.A + d.B);
+                line.anchorMin = Vector2.zero;
+                line.anchorMax = Vector2.zero;
+                line.pivot = new Vector2(0.5f, 0.5f);
+                line.anchoredPosition = new Vector2(cx, cy);
+                line.sizeDelta = new Vector2(lineLen, 2f);
+                line.localRotation = Quaternion.Euler(0, 0, angle);
+                var lineImg = line.gameObject.AddComponent<UnityEngine.UI.Image>();
+                // Stairs connections (different floors) in dotted/dimmer style
+                bool sameFloor = Mathf.Abs(a.Y - b.Y) < 0.5f;
+                lineImg.color = sameFloor
+                    ? new Color(0.5f, 0.5f, 0.45f, 0.6f)
+                    : new Color(0.4f, 0.4f, 0.5f, 0.4f);
+            }
+
+            // Player dot (gold)
+            minimapDot = UI.Rect(minimapHost, "PlayerDot");
+            minimapDot.anchorMin = Vector2.zero;
+            minimapDot.anchorMax = Vector2.zero;
+            minimapDot.pivot = new Vector2(0.5f, 0.5f);
+            minimapDot.sizeDelta = new Vector2(6, 6);
+            var dotImg = minimapDot.gameObject.AddComponent<UnityEngine.UI.Image>();
+            dotImg.color = Theme.Gold;
+        }
+
+        void UpdateMinimap()
+        {
+            if (minimapDot == null || rig == null || minimapHost == null) return;
+            if (rig.Mode != CameraMode.FirstPerson && rig.Mode != CameraMode.ThirdPerson && rig.Mode != CameraMode.TopDown)
+            {
+                minimapHost.gameObject.SetActive(false);
+                return;
+            }
+            minimapHost.gameObject.SetActive(true);
+
+            // Map world coords to minimap
+            float wMin = float.MaxValue, wMax = float.MinValue;
+            float zMin = float.MaxValue, zMax = float.MinValue;
+            foreach (var l in MapBuilder.Layouts)
+            {
+                if (l.X0 < wMin) wMin = l.X0;
+                if (l.X1 > wMax) wMax = l.X1;
+                if (l.Z0 < zMin) zMin = l.Z0;
+                if (l.Z1 > zMax) zMax = l.Z1;
+            }
+            float worldW = wMax - wMin;
+            float worldD = zMax - zMin;
+            float mapW = minimapHost.sizeDelta.x;
+            float mapH = minimapHost.sizeDelta.y;
+            float pad = 4f;
+            float drawW = mapW - pad * 2;
+            float drawH = mapH - pad * 2;
+            float scale = Mathf.Min(drawW / worldW, drawH / worldD);
+
+            Vector3 p = rig.FpPosition;
+            float dx = pad + (p.x - wMin) * scale;
+            float dy = pad + (p.z - zMin) * scale;
+            dx = Mathf.Clamp(dx, 2, mapW - 2);
+            dy = Mathf.Clamp(dy, 2, mapH - 2);
+            minimapDot.anchoredPosition = new Vector2(dx, dy);
+        }
+
+        // ==================== PROXIMITY ====================
+        void UpdateProximity()
+        {
+            if (rig == null || villa == null) return;
+            if (rig.Mode != CameraMode.FirstPerson && rig.Mode != CameraMode.ThirdPerson && rig.Mode != CameraMode.TopDown) { SetNearSuspect(-1); return; }
+
+            Vector3 playerPos = rig.FpPosition;
+            float bestDist = ProximityRange;
+            int best = -1;
+            const float NameLabelRange = 6f; // show name labels within 6 units
+
+            // Check ResidentFigure objects
+            var residents = FindObjectsByType<ResidentFigure>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            foreach (var res in residents)
+            {
+                if (res == null || !res.gameObject.activeInHierarchy) continue;
+                if (res.Visual != null && !res.Visual.activeSelf) continue;
+                float dist = Vector3.Distance(playerPos, res.transform.position);
+
+                // Show/hide name label based on proximity
+                if (res.NameLabel != null)
+                {
+                    bool showName = dist < NameLabelRange;
+                    if (res.NameLabel.activeSelf != showName)
+                        res.NameLabel.SetActive(showName);
+                }
+
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    best = res.Suspect;
+                }
+            }
+
+            // Also check SuspectMarker objects
+            if (villa.Markers != null)
+            {
+                for (int s = 0; s < caseDef.N; s++)
+                {
+                    for (int r = 0; r < caseDef.RoomCount; r++)
+                    {
+                        var m = villa.Markers[s, r];
+                        if (m == null || !m.IsVisible) continue;
+                        float dist = Vector3.Distance(playerPos, m.transform.position);
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            best = s;
+                        }
+                    }
+                }
+            }
+
+            SetNearSuspect(best);
+        }
+
+        void SetNearSuspect(int s)
+        {
+            if (s == nearSuspect) return;
+            // Auto-close interrogation panel when player walks away
+            if (s < 0 && showRight) ToggleRight(false);
+            nearSuspect = s;
+            UpdatePrompt();
+        }
+
+        void UpdatePrompt()
+        {
+            UI.Clear(promptHost);
+            // Prompt removed — player uses E to interact without floating text
+        }
+
+        void InteractWithSuspect(int s)
+        {
+            if (Session.IsOver) return;
+            Draft.Suspect = s;
+            if (Draft.Other == s) Draft.Other = -1;
+            tab = 0;
+            ToggleRight(true);
+        }
+
+        void ToggleDeduction()
+        {
+            showDeduction = !showDeduction;
+            deductionPanel.gameObject.SetActive(showDeduction);
+            if (showDeduction)
+            {
+                board.Refresh(currentTime, Truth);
+            }
+        }
+
+        void ToggleRight(bool show)
+        {
+            showRight = show;
+            rightOverlayRoot.gameObject.SetActive(showRight);
+            if (showRight)
+            {
+                BuildTabs();
+                RebuildRight(false);
+            }
+        }
+
+        // ==================== SESSION ====================
         void StartSession(bool announce)
         {
             Session = new GameSession(caseDef);
@@ -199,6 +657,11 @@ namespace Alibi.Unity
             villa.SelectRoom(-1);
             currentTime = caseDef.CrimeTimeKnown ? caseDef.CrimeTime : 0;
             timeline.Select(currentTime, false);
+            showDeduction = false;
+            showRight = false;
+            nearSuspect = -1;
+            deductionPanel.gameObject.SetActive(false);
+            rightOverlayRoot.gameObject.SetActive(false);
             CloseOverlay();
             RefreshAll();
             if (announce) Panels.Toast(canvas.transform, "Rasti u rihap me të njëjtin seed (T11). Buxheti u kthye në " + caseDef.Budget + ".", Theme.Gold, 3.5f);
@@ -211,69 +674,67 @@ namespace Alibi.Unity
             BuildTopBar();
             BuildHud();
             board.Refresh(currentTime, Truth);
-            BuildTabs();
-            RebuildRight(false);
+            if (showRight)
+            {
+                BuildTabs();
+                RebuildRight(false);
+            }
             BuildRoomCard();
         }
 
+        // ==================== TOP BAR (floating, semi-transparent) ====================
         void BuildTopBar()
         {
             UI.Clear(barHost);
-            var bg = UI.Panel(barHost, "Bar", Theme.Bar, 0, true);
+            var bg = UI.Panel(barHost, "Bar", new Color(0.04f, 0.05f, 0.07f, 0.75f), 0, true);
             UI.Stretch(bg.rectTransform, 0, 0, 0, 0);
             var line = UI.Panel(barHost, "Line", Theme.Line, 0, false);
             UI.StretchBottom(line.rectTransform, 0, 0, 0, 1);
-            UI.LabelAt(barHost, "ALIBI", Theme.Serif, 34, Theme.Parchment, 24, 18, 130, 40);
+
+            // Left: ALIBI + case title
+            UI.LabelAt(barHost, "ALIBI", Theme.Serif, 26, Theme.Gold, 20, 10, 100, 32);
             string title = caseDef.Title;
             string typeName = caseDef.Type == CaseType.Vrasja ? "Vrasja" : caseDef.Type == CaseType.Vjedhja ? "Vjedhja" : "Sabotimi";
-            string sub = typeName + " · Vila · Niveli " + caseDef.Level + " · seed " + caseDef.Seed + (Session.IsOver ? " · rasti u mbyll" : "");
-            var t1 = UI.LabelAt(barHost, title, Theme.SansSemi, 17, Theme.Text, 150, 14, 520, 24);
+            string sub = typeName + " · Niveli " + caseDef.Level;
+            var t1 = UI.LabelAt(barHost, title, Theme.SansSemi, 14, Theme.Text, 118, 8, 320, 20);
             t1.horizontalOverflow = HorizontalWrapMode.Overflow;
-            var t2 = UI.LabelAt(barHost, sub, Theme.Mono, 13, Theme.Muted, 150, 42, 520, 20);
+            var t2 = UI.LabelAt(barHost, sub, Theme.Mono, 11, Theme.Muted, 118, 28, 320, 16);
             t2.horizontalOverflow = HorizontalWrapMode.Overflow;
-            float tw = Mathf.Max(UI.TextWidth(title, Theme.SansSemi, 17), UI.TextWidth(sub, Theme.Mono, 13));
-            string crime = caseDef.Rooms[caseDef.CrimeRoom].Name + " · " + (caseDef.CrimeTimeKnown ? caseDef.Hours[caseDef.CrimeTime] : "ora ?");
-            float pw = UI.TextWidth(crime, Theme.SansSemi, 15) + 34;
-            var pill = UI.Card(barHost, "CrimePill", Theme.WithAlpha(Theme.Red, 0.12f), Theme.WithAlpha(Theme.Red, 0.7f), 18);
-            UI.Place(pill.rectTransform, 150 + tw + 24, 20, pw, 36);
-            var pt = UI.Label(pill.transform, crime, Theme.SansSemi, 15, Theme.RedText, TextAnchor.MiddleCenter);
-            UI.Stretch(pt.rectTransform, 0, 0, 0, 0);
-            pt.horizontalOverflow = HorizontalWrapMode.Overflow;
 
-            float r = 24;
-            var exit = UI.Button(barHost, Session.IsOver ? "Menyja" : "Dil nga rasti", BtnStyle.Ghost, ExitToMenu, 15, 10);
-            UI.PlaceRight(exit.Rect, r, 16, 150, 44);
-            r += 160;
-            var accuse = UI.Button(barHost, "Akuzo", Session.IsOver ? BtnStyle.Disabled : BtnStyle.Danger, OpenAccusation, 16, 10);
-            UI.PlaceRight(accuse.Rect, r, 16, 120, 44);
+            // Right side: buttons + budget
+            float r = 16;
+            var exit = UI.Button(barHost, Session.IsOver ? "Menyja" : "Dil", BtnStyle.Ghost, ExitToMenu, 13, 8);
+            UI.PlaceRight(exit.Rect, r, 6, 80, 40);
+            r += 86;
+            var accuse = UI.Button(barHost, "Akuzo", Session.IsOver ? BtnStyle.Disabled : BtnStyle.Danger, OpenAccusation, 14, 8);
+            UI.PlaceRight(accuse.Rect, r, 6, 90, 40);
             accuse.SetInteractable(!Session.IsOver);
-            r += 130;
-            var howto = UI.Button(barHost, "Si luhet", BtnStyle.Ghost, ShowHowTo, 15, 10);
-            UI.PlaceRight(howto.Rect, r, 16, 110, 44);
-            r += 120;
+            r += 96;
+            var howto = UI.Button(barHost, "?", BtnStyle.Ghost, ShowHowTo, 14, 8);
+            UI.PlaceRight(howto.Rect, r, 6, 36, 40);
+            r += 42;
             if (caseDef.Tutorial.Count > 0)
             {
-                var tut = UI.Button(barHost, tutorialVisible ? "Udhëzuesi: ndezur" : "Udhëzuesi: fikur", tutorialVisible ? BtnStyle.ChipOn : BtnStyle.Ghost, ToggleTutorial, 14, 10);
-                UI.PlaceRight(tut.Rect, r, 16, 170, 44);
-                r += 180;
+                var tut = UI.Button(barHost, tutorialVisible ? "Udh: ON" : "Udh: OFF", tutorialVisible ? BtnStyle.ChipOn : BtnStyle.Ghost, ToggleTutorial, 12, 8);
+                UI.PlaceRight(tut.Rect, r, 6, 90, 40);
+                r += 96;
             }
+
+            // Budget pips
             int remaining = Mathf.Max(0, Session.Remaining);
-            var count = UI.LabelAt(barHost, remaining + " / " + caseDef.Budget, Theme.Mono, 17, Theme.Text, 0, 0, 80, BarH, TextAnchor.MiddleRight);
-            UI.PlaceRight(count.rectTransform, r, 0, 80, BarH);
-            r += 90;
-            float pipW = 9, pipGap = 3;
-            float pipsW = caseDef.Budget * (pipW + pipGap);
+            var count = UI.LabelAt(barHost, remaining + "/" + caseDef.Budget, Theme.Mono, 14, Theme.Text, 0, 0, 50, BarH, TextAnchor.MiddleRight);
+            UI.PlaceRight(count.rectTransform, r, 0, 50, BarH);
+            r += 54;
+            float pipW = 7, pipGap = 2;
             for (int i = 0; i < caseDef.Budget; i++)
             {
                 bool full = i < remaining;
                 var pip = UI.Panel(barHost, "Pip", full ? Theme.Gold : Theme.Line, 3, false);
-                UI.PlaceRight(pip.rectTransform, r + (caseDef.Budget - 1 - i) * (pipW + pipGap), 27, pipW, 22);
+                UI.PlaceRight(pip.rectTransform, r + (caseDef.Budget - 1 - i) * (pipW + pipGap), (BarH - 18) * 0.5f, pipW, 18);
             }
-            r += pipsW + 8;
-            var lbl = UI.LabelAt(barHost, "BUXHETI", Theme.Mono, 13, Theme.Muted, 0, 0, 90, BarH, TextAnchor.MiddleRight);
-            UI.PlaceRight(lbl.rectTransform, r, 0, 90, BarH);
         }
 
+        // ==================== HUD ====================
         void BuildHud()
         {
             UI.Clear(hudHost);
@@ -281,19 +742,28 @@ namespace Alibi.Unity
             string title = Truth ? "E VËRTETA E ZBULUAR" : (caseDef.Level >= 2 ? "VILA · PËRDHESA DHE KATI I PARË" : "VILA · PËRDHESA");
             string sub = Truth ? "Pozicionet reale në " + caseDef.Hours[currentTime] : "Çfarë dihet për " + caseDef.Hours[currentTime];
             float w = Mathf.Max(UI.TextWidth(title, Theme.Mono, 13), UI.TextWidth(sub, Theme.Sans, 14)) + 30;
-            UI.Place(chip.rectTransform, 14, 14, w, 58);
+            UI.Place(chip.rectTransform, 14, BarH + 14, w, 58);
             UI.LabelAt(chip.transform, title, Theme.Mono, 13, Theme.Gold, 14, 10, w, 18).horizontalOverflow = HorizontalWrapMode.Overflow;
             UI.LabelAt(chip.transform, sub, Theme.Sans, 14, Theme.Text2, 14, 31, w, 20).horizontalOverflow = HorizontalWrapMode.Overflow;
 
-            var legend = UI.Card(hudHost, "Legend", new Color(0.05f, 0.06f, 0.08f, 0.85f), Theme.Line, 10);
-            legend.rectTransform.anchorMin = legend.rectTransform.anchorMax = new Vector2(1, 0);
-            legend.rectTransform.pivot = new Vector2(1, 0);
-            legend.rectTransform.anchoredPosition = new Vector2(-14, 14);
-            legend.rectTransform.sizeDelta = new Vector2(330, 74);
-            string legendText = "Figurë e plotë: pozicion i konfirmuar\nFigurë e tejdukshme me unazë: ende e mundshme\nPa figurë: e përjashtuar";
-            if (Truth) legendText = "Figurat tregojnë të vërtetën për orën e zgjedhur.\nE kuqja: vendi i krimit.";
-            var lt = UI.Label(legend.transform, legendText, Theme.Sans, 12, Theme.Text2, TextAnchor.MiddleLeft);
-            UI.Stretch(lt.rectTransform, 12, 6, 12, 6);
+            // Crime room pill
+            string crime = caseDef.Rooms[caseDef.CrimeRoom].Name + " · " + (caseDef.CrimeTimeKnown ? caseDef.Hours[caseDef.CrimeTime] : "ora ?");
+            float pw = UI.TextWidth(crime, Theme.SansSemi, 13) + 28;
+            var pill = UI.Card(hudHost, "CrimePill", Theme.WithAlpha(Theme.Red, 0.12f), Theme.WithAlpha(Theme.Red, 0.7f), 14);
+            UI.Place(pill.rectTransform, 14, BarH + 76, pw, 30);
+            var pt = UI.Label(pill.transform, crime, Theme.SansSemi, 13, Theme.RedText, TextAnchor.MiddleCenter);
+            UI.Stretch(pt.rectTransform, 0, 0, 0, 0);
+            pt.horizontalOverflow = HorizontalWrapMode.Overflow;
+
+            // Tab hint
+            string tabHint = showDeduction ? "[Tab] Fshih deduksionin" : "[Tab] Hap deduksionin";
+            var th = UI.Card(hudHost, "TabHint", new Color(0.05f, 0.06f, 0.08f, 0.7f), Theme.Line, 8);
+            float thw = UI.TextWidth(tabHint, Theme.Mono, 12) + 24;
+            th.rectTransform.anchorMin = th.rectTransform.anchorMax = new Vector2(0, 0);
+            th.rectTransform.pivot = new Vector2(0, 0);
+            th.rectTransform.anchoredPosition = new Vector2(14, 60);
+            th.rectTransform.sizeDelta = new Vector2(thw, 28);
+            UI.Label(th.transform, tabHint, Theme.Mono, 12, Theme.Muted, TextAnchor.MiddleCenter);
         }
 
         void BuildRoomCard()
@@ -304,7 +774,7 @@ namespace Alibi.Unity
             float iy = 12;
             if (selectedRoom < 0)
             {
-                var t = UI.LabelAt(root, "Kliko një dhomë për të parë kush mund të ketë qenë aty në orën e zgjedhur. Kliko një figurë për ta marrë në pyetje.", Theme.Sans, 13, Theme.Text2, 14, iy, 272, 20);
+                var t = UI.LabelAt(root, "Kliko një dhomë për të parë kush mund të ketë qenë aty në orën e zgjedhur. Afërohu një figure për ta marrë në pyetje.", Theme.Sans, 13, Theme.Text2, 14, iy, 272, 20);
                 iy += UI.FitHeight(t, 272) + 12;
             }
             else
@@ -420,7 +890,8 @@ namespace Alibi.Unity
         void RebuildRight(bool scrollToEnd)
         {
             UI.Clear(rightContent);
-            float y = 0, w = RightW, gap = 12;
+            float y = 0, w = rightOverlayRoot.rect.width - 16, gap = 12;
+            if (w < 200) w = 500;
             if (tab == 0)
             {
                 if (Session.IsOver)
@@ -444,6 +915,7 @@ namespace Alibi.Unity
             if (scrollToEnd) rightScroll.verticalNormalizedPosition = 0f;
         }
 
+        // ==================== TUTORIAL ====================
         public Question TutorialHint
         {
             get
@@ -485,6 +957,7 @@ namespace Alibi.Unity
             RebuildRight(false);
         }
 
+        // ==================== GAME LOGIC (unchanged) ====================
         public void SelectSuspect(int s)
         {
             if (Session.IsOver) return;
@@ -592,11 +1065,14 @@ namespace Alibi.Unity
             BuildTopBar();
             BuildHud();
             board.Refresh(currentTime, Truth);
-            BuildTabs();
-            RebuildRight(true);
+            if (showRight)
+            {
+                BuildTabs();
+                RebuildRight(true);
+            }
             BuildRoomCard();
             progressiveRules.OnQuestionAsked(outcome);
-            if (outcome.Conflict != null) Panels.Toast(canvas.transform, "Kontradiktë: disa deklarata nuk mund të jenë të gjitha të vërteta.", Theme.Red, 3f);
+            if (outcome.Conflict != null) Panels.Toast(canvas.transform, "Kontraditë: disa deklarata nuk mund të jenë të gjitha të vërteta.", Theme.Red, 3f);
             if (outcome.BudgetExhausted)
             {
                 Panels.Toast(canvas.transform, "Buxheti mbaroi. Duhet të akuzosh.", Theme.Gold, 3.5f);
@@ -701,6 +1177,10 @@ namespace Alibi.Unity
             selectedRoom = o.Verdict.Won ? caseDef.CrimeRoom : caseDef.Truth[AccPerson][caseDef.CrimeTime];
             villa.SelectRoom(selectedRoom);
             timeline.Select(currentTime, false);
+            showDeduction = true;
+            deductionPanel.gameObject.SetActive(true);
+            showRight = true;
+            rightOverlayRoot.gameObject.SetActive(true);
             RefreshAll();
             rightScroll.verticalNormalizedPosition = 1f;
             Panels.Toast(canvas.transform, o.Verdict.Won ? "Rasti u zgjidh." : "LOST: akuza ra. Shiko kufizimin që e përjashtonte.", o.Verdict.Won ? Theme.Gold : Theme.Red, 3.5f);

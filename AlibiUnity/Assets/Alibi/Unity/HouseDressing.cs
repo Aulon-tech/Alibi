@@ -47,8 +47,6 @@ namespace Alibi.Unity
             if (life != null) life.Mode = mode;
         }
 
-        // Çdo shënues i të dyshuarit merr detajet e rolit; shfaqen vetëm kur shënuesi është i konfirmuar
-        // (shënuesit "e mundshëm" janë të tejdukshëm dhe nuk duhet të kenë pjesë të forta).
         static void AddRoleLooksToMarkers(VillaView view, Kit kit)
         {
             if (view.Markers == null) return;
@@ -69,11 +67,199 @@ namespace Alibi.Unity
             }
         }
 
+        // ============ HUMANOID FIGURE BUILDER ============
+        // Detailed multi-primitive human — 55 parts: sculpted head with facial
+        // features, articulated torso with shoulder caps, jointed arms with thumbs,
+        // legs with knee-caps and calf muscles, clothing accents (collar, buttons,
+        // belt buckle, shoe soles). Still built entirely from Sphere/Cube/Cylinder
+        // primitives — no external meshes.
+        static void BuildHumanoidBody(Transform parent, Material bodyMat, Material skinMat, Material hairMat, Material shoeMat)
+        {
+            // --- shared accent materials ---
+            var urp = Shader.Find("Universal Render Pipeline/Lit");
+            Material eyeMat = skinMat, eyeWhiteMat = skinMat, beltMat = skinMat;
+            Material buckleMat = skinMat, lipMat = skinMat, browMat = skinMat;
+            if (urp != null)
+            {
+                eyeMat = new Material(urp);
+                eyeMat.color = new Color(0.10f, 0.10f, 0.12f);
+                eyeMat.SetFloat("_Smoothness", 0.92f);
+
+                eyeWhiteMat = new Material(urp);
+                eyeWhiteMat.color = new Color(0.92f, 0.90f, 0.88f);
+                eyeWhiteMat.SetFloat("_Smoothness", 0.6f);
+
+                beltMat = new Material(urp);
+                beltMat.color = new Color(0.15f, 0.12f, 0.10f);
+                beltMat.SetFloat("_Smoothness", 0.5f);
+
+                buckleMat = new Material(urp);
+                buckleMat.color = new Color(0.72f, 0.65f, 0.42f);
+                buckleMat.SetFloat("_Smoothness", 0.7f);
+
+                lipMat = new Material(urp);
+                lipMat.color = new Color(0.78f, 0.56f, 0.50f);
+                lipMat.SetFloat("_Smoothness", 0.3f);
+
+                browMat = new Material(urp);
+                browMat.color = new Color(0.82f, 0.68f, 0.56f);
+                browMat.SetFloat("_Smoothness", 0.4f);
+            }
+
+            // ===== HEAD & FACE (17 parts) =====
+            // Cranium — slightly oval
+            Part(parent, PrimitiveType.Sphere, "Cranium",
+                new Vector3(0, 1.62f, 0), new Vector3(0.26f, 0.30f, 0.27f), skinMat);
+            // Face plate — flatter sphere pushed forward
+            Part(parent, PrimitiveType.Sphere, "Face",
+                new Vector3(0, 1.58f, 0.04f), new Vector3(0.22f, 0.24f, 0.14f), skinMat);
+            // Jaw — squared lower face
+            Part(parent, PrimitiveType.Cube, "Jaw",
+                new Vector3(0, 1.50f, 0.02f), new Vector3(0.18f, 0.07f, 0.14f), skinMat);
+            // Chin — small sphere
+            Part(parent, PrimitiveType.Sphere, "Chin",
+                new Vector3(0, 1.47f, 0.08f), new Vector3(0.08f, 0.055f, 0.055f), skinMat);
+            // Brow ridge
+            Part(parent, PrimitiveType.Cube, "BrowRidge",
+                new Vector3(0, 1.665f, 0.10f), new Vector3(0.18f, 0.022f, 0.055f), browMat);
+            // Nose bridge
+            Part(parent, PrimitiveType.Cube, "NoseBridge",
+                new Vector3(0, 1.58f, 0.13f), new Vector3(0.032f, 0.065f, 0.03f), skinMat);
+            // Nose tip
+            Part(parent, PrimitiveType.Sphere, "NoseTip",
+                new Vector3(0, 1.55f, 0.14f), new Vector3(0.055f, 0.04f, 0.04f), skinMat);
+            // Ears
+            Part(parent, PrimitiveType.Sphere, "EarL",
+                new Vector3(-0.13f, 1.59f, 0), new Vector3(0.04f, 0.07f, 0.03f), skinMat);
+            Part(parent, PrimitiveType.Sphere, "EarR",
+                new Vector3(0.13f, 1.59f, 0), new Vector3(0.04f, 0.07f, 0.03f), skinMat);
+            // Eye whites
+            Part(parent, PrimitiveType.Sphere, "EyeWhiteL",
+                new Vector3(-0.06f, 1.62f, 0.105f), new Vector3(0.055f, 0.038f, 0.02f), eyeWhiteMat);
+            Part(parent, PrimitiveType.Sphere, "EyeWhiteR",
+                new Vector3(0.06f, 1.62f, 0.105f), new Vector3(0.055f, 0.038f, 0.02f), eyeWhiteMat);
+            // Irises / pupils
+            Part(parent, PrimitiveType.Sphere, "EyeL",
+                new Vector3(-0.06f, 1.62f, 0.12f), new Vector3(0.04f, 0.032f, 0.025f), eyeMat);
+            Part(parent, PrimitiveType.Sphere, "EyeR",
+                new Vector3(0.06f, 1.62f, 0.12f), new Vector3(0.04f, 0.032f, 0.025f), eyeMat);
+            // Mouth
+            Part(parent, PrimitiveType.Cube, "Mouth",
+                new Vector3(0, 1.515f, 0.12f), new Vector3(0.065f, 0.012f, 0.018f), lipMat);
+            // Hair — three overlapping spheres for volume
+            Part(parent, PrimitiveType.Sphere, "HairTop",
+                new Vector3(0, 1.72f, -0.01f), new Vector3(0.28f, 0.14f, 0.28f), hairMat);
+            Part(parent, PrimitiveType.Sphere, "HairBack",
+                new Vector3(0, 1.64f, -0.06f), new Vector3(0.27f, 0.20f, 0.22f), hairMat);
+            Part(parent, PrimitiveType.Sphere, "HairSides",
+                new Vector3(0, 1.66f, -0.02f), new Vector3(0.30f, 0.12f, 0.24f), hairMat);
+
+            // ===== NECK (2 parts) =====
+            Part(parent, PrimitiveType.Cylinder, "Neck",
+                new Vector3(0, 1.42f, 0), new Vector3(0.10f, 0.04f, 0.10f), skinMat);
+            // Trapezius / collarbone ridge
+            Part(parent, PrimitiveType.Cube, "Trapezius",
+                new Vector3(0, 1.38f, -0.01f), new Vector3(0.34f, 0.028f, 0.14f), skinMat);
+
+            // ===== TORSO (6 parts) =====
+            // Shoulder caps
+            Part(parent, PrimitiveType.Sphere, "ShoulderL",
+                new Vector3(-0.23f, 1.32f, 0), new Vector3(0.14f, 0.11f, 0.14f), bodyMat);
+            Part(parent, PrimitiveType.Sphere, "ShoulderR",
+                new Vector3(0.23f, 1.32f, 0), new Vector3(0.14f, 0.11f, 0.14f), bodyMat);
+            // Upper chest
+            Part(parent, PrimitiveType.Cube, "UpperChest",
+                new Vector3(0, 1.24f, 0), new Vector3(0.40f, 0.18f, 0.24f), bodyMat);
+            // Lower chest / ribcage
+            Part(parent, PrimitiveType.Cube, "LowerChest",
+                new Vector3(0, 1.08f, 0), new Vector3(0.36f, 0.14f, 0.22f), bodyMat);
+            // Abdomen
+            Part(parent, PrimitiveType.Cube, "Abdomen",
+                new Vector3(0, 0.95f, 0), new Vector3(0.32f, 0.10f, 0.20f), bodyMat);
+            // Hip block
+            Part(parent, PrimitiveType.Cube, "Hips",
+                new Vector3(0, 0.84f, 0), new Vector3(0.34f, 0.08f, 0.20f), bodyMat);
+
+            // ===== CLOTHING ACCENTS (4 parts) =====
+            Part(parent, PrimitiveType.Cube, "Collar",
+                new Vector3(0, 1.36f, 0.04f), new Vector3(0.16f, 0.035f, 0.10f), skinMat);
+            Part(parent, PrimitiveType.Cube, "ButtonLine",
+                new Vector3(0, 1.14f, 0.122f), new Vector3(0.022f, 0.28f, 0.006f), beltMat);
+            Part(parent, PrimitiveType.Cube, "Belt",
+                new Vector3(0, 0.88f, 0), new Vector3(0.36f, 0.035f, 0.22f), beltMat);
+            Part(parent, PrimitiveType.Cube, "BeltBuckle",
+                new Vector3(0, 0.88f, 0.11f), new Vector3(0.04f, 0.035f, 0.015f), buckleMat);
+
+            // ===== LEFT ARM (6 parts) =====
+            Part(parent, PrimitiveType.Cube, "UpperArmL",
+                new Vector3(-0.28f, 1.20f, 0), new Vector3(0.12f, 0.22f, 0.13f), bodyMat);
+            Part(parent, PrimitiveType.Sphere, "ElbowL",
+                new Vector3(-0.28f, 1.06f, 0), new Vector3(0.10f, 0.07f, 0.10f), bodyMat);
+            Part(parent, PrimitiveType.Cube, "ForearmL",
+                new Vector3(-0.28f, 0.92f, 0), new Vector3(0.10f, 0.20f, 0.11f), skinMat);
+            Part(parent, PrimitiveType.Cylinder, "WristL",
+                new Vector3(-0.28f, 0.80f, 0), new Vector3(0.06f, 0.018f, 0.06f), skinMat);
+            Part(parent, PrimitiveType.Cube, "HandL",
+                new Vector3(-0.28f, 0.73f, 0.01f), new Vector3(0.08f, 0.10f, 0.05f), skinMat);
+            Part(parent, PrimitiveType.Sphere, "ThumbL",
+                new Vector3(-0.235f, 0.74f, 0.03f), new Vector3(0.03f, 0.05f, 0.03f), skinMat);
+
+            // ===== RIGHT ARM (6 parts) =====
+            Part(parent, PrimitiveType.Cube, "UpperArmR",
+                new Vector3(0.28f, 1.20f, 0), new Vector3(0.12f, 0.22f, 0.13f), bodyMat);
+            Part(parent, PrimitiveType.Sphere, "ElbowR",
+                new Vector3(0.28f, 1.06f, 0), new Vector3(0.10f, 0.07f, 0.10f), bodyMat);
+            Part(parent, PrimitiveType.Cube, "ForearmR",
+                new Vector3(0.28f, 0.92f, 0), new Vector3(0.10f, 0.20f, 0.11f), skinMat);
+            Part(parent, PrimitiveType.Cylinder, "WristR",
+                new Vector3(0.28f, 0.80f, 0), new Vector3(0.06f, 0.018f, 0.06f), skinMat);
+            Part(parent, PrimitiveType.Cube, "HandR",
+                new Vector3(0.28f, 0.73f, 0.01f), new Vector3(0.08f, 0.10f, 0.05f), skinMat);
+            Part(parent, PrimitiveType.Sphere, "ThumbR",
+                new Vector3(0.235f, 0.74f, 0.03f), new Vector3(0.03f, 0.05f, 0.03f), skinMat);
+
+            // ===== LEFT LEG (7 parts) =====
+            Part(parent, PrimitiveType.Cube, "ThighL",
+                new Vector3(-0.11f, 0.66f, 0), new Vector3(0.15f, 0.24f, 0.15f), bodyMat);
+            Part(parent, PrimitiveType.Sphere, "KneeL",
+                new Vector3(-0.11f, 0.52f, 0.01f), new Vector3(0.11f, 0.065f, 0.11f), bodyMat);
+            Part(parent, PrimitiveType.Cube, "ShinL",
+                new Vector3(-0.11f, 0.36f, 0), new Vector3(0.11f, 0.24f, 0.12f), bodyMat);
+            Part(parent, PrimitiveType.Sphere, "CalfL",
+                new Vector3(-0.11f, 0.38f, -0.03f), new Vector3(0.09f, 0.14f, 0.07f), bodyMat);
+            Part(parent, PrimitiveType.Sphere, "AnkleL",
+                new Vector3(-0.11f, 0.20f, 0), new Vector3(0.07f, 0.05f, 0.07f), skinMat);
+            Part(parent, PrimitiveType.Cube, "FootL",
+                new Vector3(-0.11f, 0.055f, 0.04f), new Vector3(0.12f, 0.09f, 0.22f), shoeMat);
+            Part(parent, PrimitiveType.Cube, "SoleL",
+                new Vector3(-0.11f, 0.012f, 0.04f), new Vector3(0.125f, 0.018f, 0.23f), beltMat);
+
+            // ===== RIGHT LEG (7 parts) =====
+            Part(parent, PrimitiveType.Cube, "ThighR",
+                new Vector3(0.11f, 0.66f, 0), new Vector3(0.15f, 0.24f, 0.15f), bodyMat);
+            Part(parent, PrimitiveType.Sphere, "KneeR",
+                new Vector3(0.11f, 0.52f, 0.01f), new Vector3(0.11f, 0.065f, 0.11f), bodyMat);
+            Part(parent, PrimitiveType.Cube, "ShinR",
+                new Vector3(0.11f, 0.36f, 0), new Vector3(0.11f, 0.24f, 0.12f), bodyMat);
+            Part(parent, PrimitiveType.Sphere, "CalfR",
+                new Vector3(0.11f, 0.38f, -0.03f), new Vector3(0.09f, 0.14f, 0.07f), bodyMat);
+            Part(parent, PrimitiveType.Sphere, "AnkleR",
+                new Vector3(0.11f, 0.20f, 0), new Vector3(0.07f, 0.05f, 0.07f), skinMat);
+            Part(parent, PrimitiveType.Cube, "FootR",
+                new Vector3(0.11f, 0.055f, 0.04f), new Vector3(0.12f, 0.09f, 0.22f), shoeMat);
+            Part(parent, PrimitiveType.Cube, "SoleR",
+                new Vector3(0.11f, 0.012f, 0.04f), new Vector3(0.125f, 0.018f, 0.23f), beltMat);
+        }
+
         static void SpawnResidents(VillaView view, Transform parent, Kit kit, HouseLife life)
         {
             var c = view.Case;
             var rooms = HouseSpawns.Assign(c);
             var perRoom = new int[c.RoomCount];
+            // Standard materials — NO emission/glow, lit by per-figure point light
+            var skinMat = kit.Mat("#F5D4B0", 0.55f);   // warm peach skin, moderate sheen
+            var shoeMat = kit.Mat("#2A2220", 0.4f);     // dark shoes
+
             for (int s = 0; s < c.N; s++)
             {
                 int r = rooms[s];
@@ -87,20 +273,73 @@ namespace Alibi.Unity
                 go.transform.localPosition = pos;
                 var visual = new GameObject("Visual");
                 visual.transform.SetParent(go.transform, false);
-                visual.transform.localScale = Vector3.one * 1.8f;
-                var lit = kit.Mat(info.ColorHex, 0.35f);
-                var body = Part(visual.transform, PrimitiveType.Capsule, "Body", new Vector3(0, 0.4f, 0), new Vector3(0.36f, 0.4f, 0.36f), lit);
-                var head = Part(visual.transform, PrimitiveType.Sphere, "Head", new Vector3(0, 0.95f, 0), new Vector3(0.28f, 0.28f, 0.28f), lit);
+
+                // Clothing material — standard lit, NO glow/emission
+                var bodyMat = kit.Mat(info.ColorHex, 0.4f);
+                // Hair color varies by suspect
+                string hairHex;
+                switch (info.Id)
+                {
+                    case "D": hairHex = "#3B2A22"; break;  // Drita — dark brown
+                    case "G": hairHex = "#5A4630"; break;  // Genta — lighter brown
+                    case "A": hairHex = "#2A1A12"; break;  // Arta — very dark
+                    case "E": hairHex = "#6B6B6B"; break;  // Elmazi — grey
+                    default:  hairHex = "#1A1410"; break;   // dark hair
+                }
+                var hairMat = kit.Mat(hairHex, 0.2f);
+
+                BuildHumanoidBody(visual.transform, bodyMat, skinMat, hairMat, shoeMat);
+
+                // Add role-specific props on top
                 RoleLook.Attach(visual.transform, info.Id, kit);
+
+                // --- POINT LIGHT per figure: real 3D shading in dark rooms ---
+                var lightGo = new GameObject("FigureLight");
+                lightGo.transform.SetParent(go.transform, false);
+                lightGo.transform.localPosition = new Vector3(0, 2.2f, 0.5f);
+                var pl = lightGo.AddComponent<Light>();
+                pl.type = LightType.Point;
+                pl.color = new Color(1f, 0.95f, 0.85f); // warm white
+                pl.intensity = 3.0f;
+                pl.range = 5.0f;
+                pl.shadows = LightShadows.Soft;
+
+                // --- NAME LABEL (world-space, hidden until player is near) ---
+                var nameGo = new GameObject("NameLabel");
+                nameGo.transform.SetParent(go.transform, false);
+                nameGo.transform.localPosition = new Vector3(0, 2.05f, 0);
+                var nameCanvas = nameGo.AddComponent<Canvas>();
+                nameCanvas.renderMode = RenderMode.WorldSpace;
+                nameCanvas.sortingOrder = 100;
+                var nameRt = nameGo.GetComponent<RectTransform>();
+                nameRt.sizeDelta = new Vector2(240, 40);
+                nameRt.localScale = new Vector3(0.008f, 0.008f, 0.008f);
+                var txtGo = new GameObject("Text");
+                txtGo.transform.SetParent(nameGo.transform, false);
+                var txt = txtGo.AddComponent<UnityEngine.UI.Text>();
+                txt.text = info.Name;
+                txt.font = Theme.SansBold;
+                txt.fontSize = 28;
+                txt.color = Color.white;
+                txt.alignment = TextAnchor.MiddleCenter;
+                txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+                var txtRt = txtGo.GetComponent<RectTransform>();
+                txtRt.sizeDelta = new Vector2(240, 40);
+                // Shadow outline for readability
+                var shadow = txtGo.AddComponent<UnityEngine.UI.Shadow>();
+                shadow.effectColor = new Color(0, 0, 0, 0.8f);
+                shadow.effectDistance = new Vector2(1, -1);
+                nameGo.SetActive(false); // hidden by default
+
                 var res = go.AddComponent<ResidentFigure>();
                 res.Life = life;
                 res.Suspect = s;
                 res.Visual = visual;
+                res.NameLabel = nameGo;
                 life.Residents.Add(res);
             }
         }
 
-        // Pjesë pa collider (dekor mbi figurë).
         internal static GameObject Part(Transform parent, PrimitiveType type, string name, Vector3 localPos, Vector3 scale, Material mat)
         {
             var go = GameObject.CreatePrimitive(type);
@@ -114,7 +353,6 @@ namespace Alibi.Unity
             return go;
         }
 
-        // Materialet ndahen mes mobiljeve dhe figurave (Theme.Lit krijon material të ri çdo herë).
         internal sealed class Kit
         {
             readonly Dictionary<string, Material> cache = new Dictionary<string, Material>();
@@ -143,11 +381,6 @@ namespace Alibi.Unity
             }
         }
 
-        // Mobiljet e një dhome. Koordinatat (u, v) maten nga qoshja (X0, Z0) e dhomës; y0 = lartësia mbi dysheme.
-        // Mobiljet qëndrojnë te muret (brenda 0.35 m) dhe nuk prekin dyert, kalimin e fshehtë Biblioteka–Zyra,
-        // as rreshtat e figurave të Slot(): kështu klikimet dhe shënuesit mbeten të lirë.
-        // PS: position scale (matches MapBuilder.Scale for coordinate mapping)
-        // DS: dimension scale (makes furniture human-scale in the realistic rooms)
         sealed class Dresser
         {
             readonly Kit kit;
@@ -182,7 +415,6 @@ namespace Alibi.Unity
                 var col = go.GetComponent<Collider>();
                 if (solid)
                 {
-                    // PhysicsRaycaster: mobiljet nuk duhet ta bllokojnë klikimin mbi dhomën.
                     go.AddComponent<RoomClickTarget>().Room = rv;
                 }
                 else if (col != null)
@@ -228,7 +460,6 @@ namespace Alibi.Unity
                 return go;
             }
 
-            // Tapet: aq të hollë sa të mos mbulojnë theksimin e dhomës (0.012) as vendin e krimit (0.01).
             void Rug(float u, float v, float sx, float sz, string hex)
             {
                 Cube("Rug", M(hex, 0.05f), u, v, 0f, sx, 0.006f, sz, false);
@@ -238,6 +469,12 @@ namespace Alibi.Unity
             {
                 Cyl("PlantPot", M("#8A4B32"), u, v, 0f, 0.32f, 0.26f);
                 Ball("PlantLeaves", M("#3F7A45"), u, v, 0.46f, 0.4f);
+            }
+
+            void SmallPlant(float u, float v, float y0)
+            {
+                Cyl("SmallPot", M("#8A4B32"), u, v, y0, 0.12f, 0.1f, false);
+                Ball("SmallLeaves", M("#4A8A52"), u, v, y0 + 0.16f, 0.14f);
             }
 
             void FloorLamp(float u, float v, string glowHex = "#FFD9A0")
@@ -254,7 +491,6 @@ namespace Alibi.Unity
 
             void Chair(float u, float v, float backSide)
             {
-                // backSide: -1 / +1 = anën v ku është mbështetësja, 0 = pa mbështetëse
                 Cube("ChairSeat", M("#5B3F2A"), u, v, 0f, 0.26f, 0.22f, 0.26f);
                 if (backSide != 0f) Cube("ChairBack", M("#5B3F2A"), u, v + backSide * 0.115f, 0.22f, 0.26f, 0.22f, 0.04f, false);
             }
@@ -270,6 +506,18 @@ namespace Alibi.Unity
                     Cube("Book", M(BookColors[i % BookColors.Length], 0.1f), u + bw * 0.5f, v, topY, bw, bh, 0.18f, false);
                     u += bw + 0.012f;
                     i++;
+                }
+            }
+
+            void BookStack(float u, float v, float y0, int count, int seed)
+            {
+                float y = y0;
+                for (int i = 0; i < count; i++)
+                {
+                    float bh = 0.02f + 0.01f * ((seed + i) % 3);
+                    Cube("BookStack" + i, M(BookColors[(seed + i) % BookColors.Length], 0.1f),
+                        u, v, y, 0.18f, bh, 0.12f, false, 5f * ((seed + i) % 4));
+                    y += bh;
                 }
             }
 
@@ -305,6 +553,103 @@ namespace Alibi.Unity
                 light.shadows = LightShadows.Soft;
             }
 
+            // =========== CEILING LIGHT FIXTURES ===========
+            void CeilingFixture(string style)
+            {
+                float ceilY = MapBuilder.WallHeight / DS;
+                float fixtureY = ceilY - 0.08f;
+                float cU = (l.Center.x - l.X0) / PS;
+                float cV = (l.Center.z - l.Z0) / PS;
+
+                switch (style)
+                {
+                    case "chandelier":
+                        Cyl("ChandelierRod", M("#B8923F", 0.5f), cU, cV, fixtureY - 0.3f, 0.04f, 0.3f, false);
+                        Cyl("ChandelierDisc", M("#C2A673", 0.4f), cU, cV, fixtureY - 0.35f, 0.5f, 0.03f, false);
+                        float armR = 0.22f;
+                        for (int i = 0; i < 4; i++)
+                        {
+                            float angle = i * 90f * Mathf.Deg2Rad;
+                            float au = cU + Mathf.Cos(angle) * armR;
+                            float av = cV + Mathf.Sin(angle) * armR;
+                            Ball("ChandelierBulb" + i, kit.Glow("#FFE8C4", 2.0f), au, av, fixtureY - 0.42f, 0.08f);
+                        }
+                        break;
+                    case "pendant":
+                        Cyl("PendantRod", M("#2B2B2E", 0.3f), cU, cV, fixtureY - 0.22f, 0.02f, 0.22f, false);
+                        Cyl("PendantShade", M("#4A3828", 0.2f), cU, cV, fixtureY - 0.3f, 0.28f, 0.08f, false);
+                        Ball("PendantBulb", kit.Glow("#FFD9A0", 1.6f), cU, cV, fixtureY - 0.36f, 0.06f);
+                        break;
+                    case "industrial":
+                        Cyl("IndustrialChain", M("#6A6F73", 0.4f), cU, cV, fixtureY - 0.18f, 0.015f, 0.18f, false);
+                        Cyl("IndustrialCage", M("#4A5058", 0.3f), cU, cV, fixtureY - 0.26f, 0.2f, 0.14f, false);
+                        Ball("IndustrialBulb", kit.Glow("#FFB45A", 2.0f), cU, cV, fixtureY - 0.26f, 0.07f);
+                        break;
+                    case "lantern":
+                        Cyl("LanternHook", M("#2B2B2E", 0.3f), cU, cV, fixtureY - 0.1f, 0.015f, 0.1f, false);
+                        Cube("LanternFrame", M("#4A3828", 0.15f), cU, cV, fixtureY - 0.22f, 0.14f, 0.18f, 0.14f, false);
+                        Ball("LanternGlow", kit.Glow("#FFB45A", 1.4f), cU, cV, fixtureY - 0.22f, 0.08f);
+                        break;
+                    case "flush":
+                        Cyl("FlushBase", M("#6A6F73", 0.3f), cU, cV, fixtureY - 0.02f, 0.3f, 0.04f, false);
+                        Ball("FlushGlobe", kit.Glow("#FFE2C8", 1.4f), cU, cV, fixtureY - 0.08f, 0.12f);
+                        break;
+                }
+            }
+
+            // =========== WALL ART / CLOCKS / MIRRORS ===========
+            void WallPainting(float u, float v, float y0, float sx, float sy, string frameHex, string canvasHex)
+            {
+                Cube("PaintingFrame", M(frameHex, 0.3f), u, v, y0, sx + 0.04f, sy + 0.04f, 0.02f, false);
+                Cube("PaintingCanvas", M(canvasHex, 0.05f), u, v, y0 + 0.02f, sx, sy, 0.015f, false);
+            }
+
+            void WallClock(float u, float v, float y0)
+            {
+                Cyl("ClockBody", M("#4A3320", 0.3f), u, v, y0, 0.22f, 0.03f, false);
+                Cyl("ClockFace", kit.Glow("#F0E6C8", 0.8f), u, v, y0 + 0.016f, 0.18f, 0.005f, false);
+            }
+
+            void WallMirror(float u, float v, float y0, float sx, float sy)
+            {
+                Cube("MirrorFrame", M("#B8923F", 0.5f), u, v, y0, sx + 0.04f, sy + 0.04f, 0.02f, false);
+                Cube("MirrorGlass", M("#A8B8C8", 0.9f), u, v, y0 + 0.01f, sx, sy, 0.01f, false);
+            }
+
+            // Curtain pair flanking a window position
+            void Curtains(float u, float v, float sx, string hex)
+            {
+                float half = sx * 0.15f;
+                Cube("CurtainL", M(hex, 0.05f), u - sx * 0.4f, v, 0.3f, half, 0.65f, 0.03f, false);
+                Cube("CurtainR", M(hex, 0.05f), u + sx * 0.4f, v, 0.3f, half, 0.65f, 0.03f, false);
+                // curtain rod
+                Cyl("CurtainRod", M("#B8923F", 0.4f), u, v, 0.94f, 0.02f, sx * 0.5f, false);
+            }
+
+            // Decorative bowl / dish
+            void Bowl(float u, float v, float y0, string hex)
+            {
+                Cyl("Bowl", M(hex, 0.3f), u, v, y0, 0.16f, 0.04f, false);
+            }
+
+            // Wine glass
+            void WineGlass(float u, float v, float y0)
+            {
+                Cyl("WineGlass", M("#A8B8C8", 0.8f), u, v, y0, 0.04f, 0.09f, false);
+            }
+
+            // Candle
+            void Candle(float u, float v, float y0, string name)
+            {
+                Cyl(name, kit.Glow("#FFE2A8", 1.5f), u, v, y0, 0.04f, 0.1f, false);
+            }
+
+            // Newspaper / flat paper
+            void Paper(float u, float v, float y0, float rotY = 0f)
+            {
+                Cube("Paper", M("#D8CBB0", 0.05f), u, v, y0, 0.2f, 0.005f, 0.14f, false, rotY);
+            }
+
             public void Dress()
             {
                 switch (l.Id)
@@ -324,163 +669,408 @@ namespace Alibi.Unity
 
             void RoomLight()
             {
-                Color color = new Color(1f, 0.8f, 0.55f);
-                float intensity = 1.4f;
+                Color color = new Color(1f, 0.88f, 0.68f);
+                float intensity = 3.5f;
                 switch (l.Id)
                 {
-                    case "KU": color = new Color(1f, 0.86f, 0.64f); break;
-                    case "BI": color = new Color(1f, 0.74f, 0.45f); break;
-                    case "ZY": color = new Color(1f, 0.87f, 0.68f); break;
-                    case "BO": color = new Color(1f, 0.66f, 0.38f); intensity = 1.0f; break;
-                    case "SH": intensity = 1.0f; break;
+                    case "HO": color = new Color(1f, 0.90f, 0.70f); intensity = 3.8f; break;
+                    case "SA": color = new Color(1f, 0.85f, 0.65f); intensity = 3.5f; break;
+                    case "BI": color = new Color(1f, 0.82f, 0.58f); intensity = 3.2f; break;
+                    case "DN": color = new Color(1f, 0.88f, 0.66f); intensity = 3.5f; break;
+                    case "KU": color = new Color(1f, 0.92f, 0.72f); intensity = 3.8f; break;
+                    case "SH": color = new Color(1f, 0.85f, 0.60f); intensity = 3.0f; break;
+                    case "KO": color = new Color(1f, 0.85f, 0.62f); intensity = 3.2f; break;
+                    case "ZY": color = new Color(1f, 0.90f, 0.72f); intensity = 3.5f; break;
+                    case "BO": color = new Color(1f, 0.75f, 0.50f); intensity = 2.5f; break;
                 }
-                float range = Mathf.Max(w, d) * 0.65f + 4f;
+                float range = Mathf.Max(w, d) * 0.8f + 6f;
                 CeilingLamp(color, range, intensity, "RoomLight_" + l.Id);
+                // Add a secondary fill light at floor level for better visibility
+                Lamp(new Vector3(l.Center.x, l.Y + 0.8f, l.Center.z),
+                    new Color(color.r * 0.7f, color.g * 0.7f, color.b * 0.7f),
+                    Mathf.Max(w, d) * 0.4f + 2f, intensity * 0.3f, "FillLight_" + l.Id);
             }
+
+            // =====================================================
+            //   ROOM DRESSING — each room packed with objects
+            // =====================================================
 
             void Hall()
             {
+                CeilingFixture("chandelier");
                 Rug(2.0f, 1.5f, 1.8f, 1.1f, "#6E2F37");
+                // Console table with vase and key bowl
                 Cube("Console", M("#5B3F2A"), 2.0f, 0.22f, 0f, 1.0f, 0.42f, 0.26f);
                 Cyl("Vase", M("#B8923F", 0.5f), 2.0f, 0.22f, 0.42f, 0.12f, 0.18f, false);
+                Cyl("KeyBowl", M("#B8923F", 0.5f), 2.3f, 0.22f, 0.42f, 0.14f, 0.04f, false);
+                SmallPlant(1.7f, 0.22f, 0.42f);
+                // Large potted plants
                 Plant(0.3f, 0.3f);
                 Plant(3.7f, 0.3f);
+                // Coat stand + umbrella stand
                 Cyl("CoatStand", M("#5B3F2A"), 3.7f, 2.7f, 0f, 0.14f, 1.0f);
                 Cyl("CoatStandBase", M("#2B2B2E"), 3.7f, 2.7f, 0f, 0.3f, 0.05f, false);
+                Cyl("UmbrellaStand", M("#4A3828"), 3.5f, 2.7f, 0f, 0.18f, 0.35f);
+                // Floor lamp
                 FloorLamp(0.3f, 2.7f);
+                // Wall mirror above console
+                WallMirror(2.0f, 0.08f, 0.6f, 0.5f, 0.35f);
+                // Hall paintings
+                WallPainting(0.6f, 0.08f, 0.55f, 0.3f, 0.22f, "#5B3F2A", "#2A3A4A");
+                WallPainting(3.4f, 0.08f, 0.5f, 0.25f, 0.2f, "#B8923F", "#3A2E1E");
+                // Curtains flanking imagined window
+                Curtains(2.0f, 2.92f, 0.9f, "#6E2F37");
+                // Small bench by wall
+                Cube("HallBench", M("#5B3F2A"), 0.6f, 2.78f, 0f, 0.6f, 0.24f, 0.22f);
+                Cube("HallCushion", M("#D2AD62", 0.1f), 0.6f, 2.76f, 0.24f, 0.4f, 0.08f, 0.18f, false);
+                // Door mat
+                Cube("DoorMat", M("#4A3828", 0.05f), 2.0f, 2.85f, 0f, 0.5f, 0.006f, 0.3f, false);
+                // Shoes near door
+                Cube("Shoe1", M("#2B1A12", 0.2f), 1.4f, 2.8f, 0f, 0.08f, 0.05f, 0.14f, false, 15f);
+                Cube("Shoe2", M("#2B1A12", 0.2f), 1.5f, 2.8f, 0f, 0.08f, 0.05f, 0.14f, false, 5f);
             }
 
             void Salon()
             {
+                CeilingFixture("chandelier");
                 Rug(2.2f, 1.5f, 2.4f, 1.5f, "#2E3F5C");
-                // divan në murin veriorë
+                // Sofa with cushions
                 Cube("SofaSeat", M("#6E2F37", 0.2f), 2.0f, 2.8f, 0f, 1.7f, 0.22f, 0.24f);
                 Cube("SofaBack", M("#6E2F37", 0.2f), 2.0f, 2.885f, 0f, 1.7f, 0.5f, 0.07f);
                 Cube("SofaArmL", M("#6E2F37", 0.2f), 1.22f, 2.8f, 0f, 0.14f, 0.32f, 0.24f);
                 Cube("SofaArmR", M("#6E2F37", 0.2f), 2.78f, 2.8f, 0f, 0.14f, 0.32f, 0.24f);
-                // tavolinë kafeje
+                Cube("CushionL", M("#D2AD62", 0.1f), 1.5f, 2.76f, 0.22f, 0.22f, 0.14f, 0.18f, false, 5f);
+                Cube("CushionM", M("#4A5068", 0.1f), 2.0f, 2.76f, 0.22f, 0.2f, 0.12f, 0.16f, false, -3f);
+                Cube("CushionR", M("#2E3F5C", 0.1f), 2.5f, 2.76f, 0.22f, 0.22f, 0.14f, 0.18f, false, -8f);
+                // Coffee table with items
                 Cube("CoffeeTable", M("#7C5A3A", 0.3f), 1.1f, 1.5f, 0f, 0.8f, 0.3f, 0.45f);
                 Cyl("CoffeeCup", M("#D8CBB0"), 1.0f, 1.5f, 0.3f, 0.09f, 0.07f, false);
-                // oxhak në murin jugor
+                Cube("CoffeeBook", M("#8C3B3B", 0.1f), 1.25f, 1.65f, 0.3f, 0.16f, 0.025f, 0.12f, false);
+                BookStack(1.3f, 1.35f, 0.3f, 3, 2);
+                Bowl(0.95f, 1.7f, 0.3f, "#B8923F");
+                Paper(1.4f, 1.5f, 0.3f, 12f);
+                // Fireplace
                 Cube("Fireplace", M("#6E6A64", 0.1f), 3.2f, 0.22f, 0f, 0.9f, 0.8f, 0.28f);
                 Cube("Fire", kit.Glow("#FF7A2E", 2.2f), 3.2f, 0.375f, 0.08f, 0.4f, 0.22f, 0.03f, false);
                 Lamp(P(3.2f, 0.7f, 0.5f), new Color(1f, 0.5f, 0.2f), 2.2f, 0.5f, "FireGlow");
-                // tavolinë anësore me llambë
+                Candle(2.85f, 0.22f, 0.8f, "MantelCandleL");
+                Candle(3.55f, 0.22f, 0.8f, "MantelCandleR");
+                Cube("MantelShelf", M("#5B3F2A"), 3.2f, 0.22f, 0.78f, 1.05f, 0.04f, 0.14f, false);
+                // Photo frame on mantel
+                Cube("PhotoFrame", M("#5B3F2A", 0.3f), 3.1f, 0.22f, 0.84f, 0.08f, 0.1f, 0.02f, false);
+                Ball("MantelOrnament", M("#D2AD62", 0.4f), 3.4f, 0.22f, 0.86f, 0.06f);
+                // Painting above fireplace
+                WallPainting(3.2f, 0.08f, 0.55f, 0.4f, 0.28f, "#B8923F", "#2A3A4A");
+                // Side table with lamp
                 Cube("SideTable", M("#5B3F2A"), 3.55f, 2.68f, 0f, 0.4f, 0.45f, 0.4f);
                 TableLamp(3.55f, 2.68f, 0.45f);
+                SmallPlant(3.55f, 2.5f, 0.45f);
+                // Large potted plant
                 Plant(0.3f, 2.7f);
+                Plant(0.3f, 0.3f);
+                // Armchair + ottoman
+                Cube("ArmchairSeat", M("#5E4A38", 0.2f), 3.6f, 1.5f, 0f, 0.36f, 0.22f, 0.34f);
+                Cube("ArmchairBack", M("#5E4A38", 0.2f), 3.78f, 1.5f, 0f, 0.08f, 0.5f, 0.34f);
+                Cube("ArmchairArmL", M("#5E4A38", 0.2f), 3.6f, 1.32f, 0f, 0.08f, 0.3f, 0.08f, false);
+                Cube("ArmchairArmR", M("#5E4A38", 0.2f), 3.6f, 1.68f, 0f, 0.08f, 0.3f, 0.08f, false);
+                Cube("Ottoman", M("#5E4A38", 0.1f), 3.3f, 1.5f, 0f, 0.24f, 0.14f, 0.24f, false);
+                // Floor lamp by armchair
+                FloorLamp(3.75f, 2.0f);
+                // Curtains
+                Curtains(1.5f, 0.08f, 0.8f, "#2E3F5C");
+                // Second painting
+                WallPainting(0.5f, 2.92f, 0.5f, 0.3f, 0.22f, "#5B3F2A", "#4A5A3A");
+                // Small rug by armchair
+                Rug(3.5f, 1.5f, 0.6f, 0.5f, "#5E2E34");
+                // Wine glass on side table
+                WineGlass(3.4f, 2.68f, 0.45f);
             }
 
             void Library()
             {
+                CeilingFixture("pendant");
                 Rug(1.5f, 1.5f, 1.5f, 1.1f, "#5E2E34");
-                // rafte në veri
+                // Bookshelves north wall
                 Shelf("ShelfN1", 0.9f, 2.79f, 1.1f, 0.26f, 0.85f, 1, true);
                 Shelf("ShelfN2", 2.1f, 2.79f, 1.1f, 0.26f, 0.85f, 4, true);
-                // rafte në perëndim, me hapësirë për kalimin e fshehtë (v 1.0–2.0)
+                // Bookshelves west wall (with gap for passage)
                 Shelf("ShelfW1", 0.22f, 0.55f, 0.28f, 0.8f, 0.85f, 0, false);
                 Shelf("ShelfW2", 0.22f, 2.3f, 0.28f, 0.5f, 0.85f, 0, false);
-                // rafte në lindje, me hapësirë për derën (v 1–2)
+                // Bookshelves east wall (with gap for door)
                 Shelf("ShelfE1", 2.8f, 0.52f, 0.26f, 0.74f, 0.85f, 0, false);
                 Shelf("ShelfE2", 2.8f, 2.3f, 0.26f, 0.5f, 0.85f, 0, false);
-                // tavolinë leximi me llambë
+                // Reading table with items
                 Cube("ReadingTable", M("#7C5A3A", 0.3f), 1.9f, 1.5f, 0f, 0.7f, 0.32f, 0.5f);
                 Cube("OpenBook", M("#D8CBB0", 0.1f), 1.78f, 1.5f, 0.32f, 0.2f, 0.02f, 0.14f, false);
                 TableLamp(2.1f, 1.5f, 0.32f, "#FFC97A");
+                BookStack(1.65f, 1.3f, 0.32f, 4, 7);
+                Paper(2.0f, 1.7f, 0.32f, -15f);
+                Cyl("InkWell", M("#1A1D24", 0.3f), 2.15f, 1.3f, 0.32f, 0.04f, 0.06f, false);
+                // Globe on a stand
+                Cyl("GlobeStand", M("#5B3F2A"), 0.4f, 1.5f, 0f, 0.08f, 0.5f, false);
+                Ball("Globe", M("#3B5C8C", 0.2f), 0.4f, 1.5f, 0.6f, 0.2f);
+                // Reading chair with footstool
+                Cube("ReadChairSeat", M("#6E2F37", 0.2f), 1.5f, 0.8f, 0f, 0.3f, 0.22f, 0.3f);
+                Cube("ReadChairBack", M("#6E2F37", 0.2f), 1.5f, 0.65f, 0.22f, 0.3f, 0.26f, 0.04f, false);
+                Cube("Footstool", M("#6E2F37", 0.1f), 1.5f, 1.0f, 0f, 0.2f, 0.12f, 0.18f, false);
+                // Floor lamp by reading chair
+                FloorLamp(1.2f, 0.6f, "#FFC97A");
+                // Additional book stacks on floor
+                BookStack(0.3f, 2.0f, 0f, 5, 10);
+                BookStack(2.6f, 2.6f, 0f, 3, 15);
+                // Magnifying glass on table
+                Cyl("MagnifyHandle", M("#5B3F2A"), 2.2f, 1.65f, 0.32f, 0.025f, 0.08f, false);
+                // Ladder leaning against shelf
+                Cube("LadderRailL", M("#5B3F2A"), 0.14f, 1.6f, 0f, 0.03f, 0.95f, 0.03f, false);
+                Cube("LadderRailR", M("#5B3F2A"), 0.3f, 1.6f, 0f, 0.03f, 0.95f, 0.03f, false);
+                // Wall painting
+                WallPainting(1.5f, 0.08f, 0.55f, 0.3f, 0.22f, "#4A3320", "#6E4A2E");
+                // Small plant on shelf top
+                SmallPlant(0.6f, 2.79f, 0.85f);
             }
 
             void Dining()
             {
+                CeilingFixture("chandelier");
                 Rug(1.9f, 1.5f, 1.9f, 1.3f, "#5E2430");
+                // Dining table with full settings
                 Cube("DiningTable", M("#7C5A3A", 0.3f), 1.9f, 1.5f, 0f, 1.2f, 0.32f, 0.6f);
                 Cube("TableCloth", M("#D8CBB0", 0.05f), 1.9f, 1.5f, 0.32f, 1.3f, 0.01f, 0.5f, false);
-                Cyl("Candle1", kit.Glow("#FFE2A8", 2f), 1.6f, 1.5f, 0.33f, 0.05f, 0.13f, false);
-                Cyl("Candle2", kit.Glow("#FFE2A8", 2f), 2.2f, 1.5f, 0.33f, 0.05f, 0.13f, false);
+                Candle(1.6f, 1.5f, 0.33f, "Candle1");
+                Candle(2.2f, 1.5f, 0.33f, "Candle2");
+                // Candle holder/centerpiece
+                Cyl("Centerpiece", M("#B8923F", 0.4f), 1.9f, 1.5f, 0.33f, 0.08f, 0.06f, false);
+                // 6 place settings: plates, glasses, napkins
+                float[] pu = { 1.55f, 2.25f, 1.55f, 2.25f, 1.9f, 1.9f };
+                float[] pv = { 1.1f, 1.1f, 1.9f, 1.9f, 1.1f, 1.9f };
+                for (int i = 0; i < 6; i++)
+                {
+                    Cyl("Plate" + i, M("#D8CBB0", 0.1f), pu[i], pv[i], 0.33f, 0.14f, 0.012f, false);
+                    // Napkin
+                    Cube("Napkin" + i, M("#D8CBB0", 0.05f), pu[i] + 0.1f, pv[i], 0.33f, 0.06f, 0.006f, 0.1f, false);
+                }
+                WineGlass(1.72f, 1.1f, 0.33f);
+                WineGlass(2.42f, 1.1f, 0.33f);
+                WineGlass(1.72f, 1.9f, 0.33f);
+                WineGlass(2.42f, 1.9f, 0.33f);
+                // 6 chairs
                 Chair(1.55f, 0.95f, -1f);
                 Chair(2.25f, 0.95f, -1f);
                 Chair(1.55f, 2.05f, 1f);
                 Chair(2.25f, 2.05f, 1f);
                 Chair(2.68f, 1.5f, 0f);
+                Chair(1.12f, 1.5f, 0f);
+                // Sideboard with decorations
                 Cube("Sideboard", M("#4A3320"), 1.5f, 2.78f, 0f, 1.4f, 0.5f, 0.26f);
                 Cyl("SideboardVase", M("#B8923F", 0.5f), 1.0f, 2.78f, 0.5f, 0.12f, 0.2f, false);
+                Cyl("WineBottle", M("#2F3A28", 0.4f), 1.8f, 2.78f, 0.5f, 0.06f, 0.18f, false);
+                Cyl("WineBottle2", M("#5A2F3A", 0.4f), 1.6f, 2.78f, 0.5f, 0.06f, 0.18f, false);
+                Bowl(1.3f, 2.78f, 0.5f, "#D2AD62");
+                SmallPlant(2.0f, 2.78f, 0.5f);
+                // Fruit bowl on sideboard (a few spheres)
+                Ball("Apple1", M("#8C3B3B", 0.15f), 1.35f, 2.78f, 0.56f, 0.05f);
+                Ball("Apple2", M("#4C7A4C", 0.15f), 1.28f, 2.78f, 0.56f, 0.05f);
+                Ball("Orange", M("#D2AD62", 0.15f), 1.32f, 2.78f, 0.58f, 0.04f);
                 Plant(0.3f, 2.7f);
+                Plant(0.3f, 0.3f);
+                // Wall painting
+                WallPainting(1.9f, 2.92f, 0.55f, 0.5f, 0.3f, "#5B3F2A", "#3A2E22");
+                WallPainting(0.5f, 0.08f, 0.5f, 0.3f, 0.25f, "#B8923F", "#4A3828");
+                // Wall clock
+                WallClock(0.15f, 1.5f, 0.65f);
+                // Curtains
+                Curtains(2.5f, 0.08f, 0.8f, "#5E2430");
+                // Corner cabinet
+                Cube("CornerCabinet", M("#4A3320"), 3.5f, 0.3f, 0f, 0.5f, 0.65f, 0.3f);
+                Cyl("CabinetDecanter", M("#A8B8C8", 0.7f), 3.5f, 0.3f, 0.65f, 0.08f, 0.14f, false);
             }
 
             void Kitchen()
             {
-                // sobë në lindje
+                CeilingFixture("flush");
+                // Stove with pots and kettle
                 Cube("Stove", M("#2B2B2E", 0.3f), 2.8f, 0.55f, 0f, 0.26f, 0.45f, 0.8f);
                 Cyl("StoveCoil1", kit.Glow("#FF6A2A", 2f), 2.8f, 0.4f, 0.45f, 0.14f, 0.012f, false);
                 Cyl("StoveCoil2", kit.Glow("#FF6A2A", 2f), 2.8f, 0.7f, 0.45f, 0.14f, 0.012f, false);
                 Cyl("Pot", M("#8A9099", 0.5f), 2.8f, 0.4f, 0.46f, 0.16f, 0.12f, false);
+                Cyl("Kettle", M("#8A9099", 0.5f), 2.8f, 0.7f, 0.46f, 0.12f, 0.1f, false);
                 Lamp(P(2.8f, 0.55f, 0.7f), new Color(1f, 0.45f, 0.2f), 1.8f, 0.4f, "StoveGlow");
-                // banak me lavaman në jug
+                // Counter with sink
                 Cube("Counter", M("#6A6F73", 0.3f), 1.15f, 0.22f, 0f, 1.5f, 0.42f, 0.27f);
                 Cube("Basin", M("#3A4650", 0.5f), 1.0f, 0.22f, 0.42f, 0.4f, 0.012f, 0.18f, false);
                 Cyl("Faucet", M("#8A9099", 0.6f), 1.0f, 0.12f, 0.42f, 0.03f, 0.15f, false);
-                // dollapë në veri, me hapësirë për derën (u 1–2)
+                // Cutting board, knife, spice jars
+                Cube("CuttingBoard", M("#B8923F", 0.1f), 1.5f, 0.22f, 0.42f, 0.2f, 0.012f, 0.14f, false);
+                Cube("Knife", M("#8A9099", 0.6f), 1.65f, 0.22f, 0.44f, 0.02f, 0.008f, 0.14f, false);
+                Cyl("SpiceJar1", M("#9A5F3A", 0.3f), 1.8f, 0.22f, 0.42f, 0.04f, 0.07f, false);
+                Cyl("SpiceJar2", M("#4C7A4C", 0.3f), 1.86f, 0.22f, 0.42f, 0.04f, 0.07f, false);
+                // Plate stack on counter
+                for (int i = 0; i < 4; i++)
+                    Cyl("StackPlate" + i, M("#D8CBB0", 0.1f), 0.55f, 0.22f, 0.42f + i * 0.013f, 0.12f, 0.012f, false);
+                // Cupboards
                 Cube("CupboardL", M("#7C5A3A"), 0.55f, 2.78f, 0f, 0.8f, 0.6f, 0.26f);
                 Cube("CupboardR", M("#7C5A3A"), 2.45f, 2.78f, 0f, 0.8f, 0.6f, 0.26f);
+                // Hanging pan rack + pans
+                Cube("PanRack", M("#2B2B2E"), 1.5f, 1.5f, 0.95f, 0.6f, 0.03f, 0.06f, false);
+                Cyl("HangingPan1", M("#4A5058", 0.4f), 1.3f, 1.5f, 0.8f, 0.16f, 0.03f, false);
+                Cyl("HangingPan2", M("#4A5058", 0.4f), 1.7f, 1.5f, 0.82f, 0.14f, 0.03f, false);
+                Cyl("HangingPan3", M("#6A6F73", 0.4f), 1.5f, 1.5f, 0.78f, 0.12f, 0.03f, false);
+                // Kitchen table with items
+                Cube("KitchenTable", M("#7C5A3A", 0.2f), 1.5f, 1.5f, 0f, 0.6f, 0.35f, 0.5f);
+                Cyl("KitMug", M("#D8CBB0"), 1.3f, 1.5f, 0.35f, 0.06f, 0.07f, false);
+                Paper(1.6f, 1.3f, 0.35f, 8f);
+                // Stool at kitchen table
+                Cyl("Stool1", M("#5B3F2A"), 1.5f, 1.1f, 0f, 0.18f, 0.28f);
+                Cyl("Stool2", M("#5B3F2A"), 1.5f, 1.9f, 0f, 0.18f, 0.28f);
+                // Broom leaning against wall
+                Cyl("BroomHandle", M("#B8923F", 0.1f), 0.15f, 1.0f, 0f, 0.02f, 0.9f, false);
+                // Fruit bowl
+                Bowl(1.4f, 1.65f, 0.35f, "#D8CBB0");
+                Ball("Fruit1", M("#8C3B3B", 0.15f), 1.42f, 1.68f, 0.4f, 0.04f);
+                Ball("Fruit2", M("#D2AD62", 0.15f), 1.38f, 1.62f, 0.4f, 0.04f);
+                // Towel (thin slab on handle)
+                Cube("TowelBar", M("#8A9099", 0.4f), 2.8f, 1.1f, 0.3f, 0.02f, 0.02f, 0.2f, false);
+                Cube("Towel", M("#D8CBB0", 0.05f), 2.8f, 1.1f, 0.18f, 0.01f, 0.18f, 0.16f, false);
             }
 
             void Stairs()
             {
-                // shkallët zënë pjesën majtas; fener në qoshen e lirë
+                CeilingFixture("lantern");
+                // Lantern on stand
                 Cyl("LanternPole", M("#2B2B2E"), 2.75f, 2.75f, 0f, 0.07f, 0.8f);
                 Ball("Lantern", kit.Glow("#FFC97A", 2f), 2.75f, 2.75f, 0.9f, 0.22f);
+                // Stair railing post
+                Cyl("RailPost1", M("#5B3F2A"), 1.3f, 0.5f, 0f, 0.06f, 0.5f, false);
+                Cyl("RailPost2", M("#5B3F2A"), 1.3f, 2.0f, 0f, 0.06f, 0.5f, false);
+                Cube("Railing", M("#5B3F2A"), 1.3f, 1.25f, 0.48f, 0.04f, 0.04f, 1.5f * PS / DS, false);
+                // Wall paintings along staircase
+                WallPainting(2.5f, 0.08f, 0.4f, 0.22f, 0.18f, "#5B3F2A", "#3B5C8C");
+                WallPainting(2.5f, 0.08f, 0.7f, 0.2f, 0.16f, "#4A3320", "#6E4A2E");
+                // Small table with candle
+                Cube("StairTable", M("#5B3F2A"), 2.8f, 0.3f, 0f, 0.3f, 0.35f, 0.25f);
+                Candle(2.8f, 0.3f, 0.35f, "StairCandle");
             }
 
             void Corridor()
             {
+                CeilingFixture("flush");
+                // Console table with vase
                 Cube("Console", M("#5B3F2A"), 1.5f, 0.22f, 0f, 1.0f, 0.42f, 0.26f);
                 Cyl("Vase", M("#B8923F", 0.5f), 1.5f, 0.22f, 0.42f, 0.12f, 0.18f, false);
+                SmallPlant(1.8f, 0.22f, 0.42f);
+                // Grandfather clock
                 Cube("GrandfatherClock", M("#4A3320"), 0.22f, 1.5f, 0f, 0.28f, 1.0f, 0.3f);
                 Cube("ClockFace", kit.Glow("#F0E6C8", 1.2f), 0.22f, 1.5f, 0.82f, 0.29f, 0.14f, 0.16f, false);
+                // Benches along north wall
                 Cube("BenchL", M("#5B3F2A"), 0.7f, 2.78f, 0f, 0.8f, 0.25f, 0.24f);
+                Cube("BenchCushionL", M("#6E2F37", 0.1f), 0.7f, 2.76f, 0.25f, 0.6f, 0.06f, 0.2f, false);
                 Cube("BenchR", M("#5B3F2A"), 2.9f, 2.78f, 0f, 0.8f, 0.25f, 0.24f);
+                Cube("BenchCushionR", M("#2E3F5C", 0.1f), 2.9f, 2.76f, 0.25f, 0.6f, 0.06f, 0.2f, false);
                 Plant(3.35f, 0.3f);
+                Plant(0.3f, 0.3f);
+                // Wall paintings
+                WallPainting(2.0f, 0.08f, 0.5f, 0.35f, 0.25f, "#5B3F2A", "#4A3A28");
+                WallPainting(1.0f, 2.92f, 0.5f, 0.3f, 0.2f, "#B8923F", "#2A3A4A");
+                WallPainting(2.5f, 2.92f, 0.55f, 0.25f, 0.2f, "#4A3320", "#5A4A3A");
+                // Runner rug
+                Rug(1.8f, 1.5f, 2.5f, 0.5f, "#5E2E34");
+                // Wall sconces (small glowing spheres on brackets)
+                Cube("SconceBracketL", M("#B8923F", 0.4f), 0.9f, 0.08f, 0.6f, 0.04f, 0.06f, 0.06f, false);
+                Ball("SconceGlowL", kit.Glow("#FFD9A0", 1.2f), 0.9f, 0.11f, 0.64f, 0.06f);
+                Cube("SconceBracketR", M("#B8923F", 0.4f), 2.7f, 0.08f, 0.6f, 0.04f, 0.06f, 0.06f, false);
+                Ball("SconceGlowR", kit.Glow("#FFD9A0", 1.2f), 2.7f, 0.11f, 0.64f, 0.06f);
             }
 
             void Office()
             {
+                CeilingFixture("pendant");
                 Rug(1.9f, 1.5f, 1.8f, 1.2f, "#2E3F5C");
-                // tavolinë pune në perëndim, me karrige dhe llambë
+                // Desk with many items
                 Cube("Desk", M("#4A3320", 0.3f), 0.42f, 1.5f, 0f, 0.6f, 0.42f, 1.2f);
                 TableLamp(0.3f, 1.1f, 0.42f, "#FFE9C4");
                 Cube("Papers", M("#D8CBB0", 0.05f), 0.5f, 1.8f, 0.42f, 0.28f, 0.012f, 0.2f, false);
                 Cube("Folder", M("#D8B365", 0.1f), 0.5f, 1.45f, 0.42f, 0.26f, 0.02f, 0.2f, false);
+                Cyl("PenHolder", M("#2B2B2E"), 0.35f, 1.6f, 0.42f, 0.06f, 0.08f, false);
+                Cyl("InkBottle", M("#1A1D24", 0.3f), 0.6f, 1.3f, 0.42f, 0.04f, 0.06f, false);
+                // Letter opener
+                Cube("LetterOpener", M("#B8923F", 0.5f), 0.35f, 1.75f, 0.42f, 0.015f, 0.005f, 0.12f, false);
+                // Stamp pad
+                Cube("StampPad", M("#8C3B3B", 0.1f), 0.3f, 1.9f, 0.42f, 0.06f, 0.015f, 0.08f, false);
+                // Paperweight
+                Ball("Paperweight", M("#3B5C8C", 0.6f), 0.6f, 1.75f, 0.45f, 0.04f);
+                BookStack(0.65f, 1.1f, 0.42f, 3, 5);
+                // Desk chair
                 Cube("ChairSeat", M("#2B2B2E", 0.3f), 0.98f, 1.5f, 0f, 0.3f, 0.24f, 0.3f);
                 Cube("ChairBack", M("#2B2B2E", 0.3f), 1.12f, 1.5f, 0.24f, 0.05f, 0.24f, 0.3f, false);
-                // raft dhe kabinet në veri
+                // Bookshelf and file cabinet
                 Shelf("Bookshelf", 1.3f, 2.79f, 1.4f, 0.26f, 0.8f, 2, true);
                 Cube("FileCabinet", M("#6A6F73", 0.4f), 3.27f, 2.74f, 0f, 0.5f, 0.7f, 0.36f);
-                // kasaforte në qoshen juglindore (larg kalimit të fshehtë)
+                // Safe
                 Cube("Safe", M("#4A5058", 0.5f), 3.36f, 0.27f, 0f, 0.32f, 0.5f, 0.32f);
                 Cyl("SafeDial", M("#B8923F", 0.6f), 3.36f, 0.27f, 0.5f, 0.12f, 0.02f, false);
+                // Wall clock + paintings
+                WallClock(2.0f, 2.92f, 0.6f);
+                WallPainting(2.5f, 0.08f, 0.5f, 0.4f, 0.3f, "#4A3320", "#D8CBB0");
+                WallPainting(3.0f, 2.92f, 0.5f, 0.25f, 0.2f, "#5B3F2A", "#2A3A4A");
+                // Wastebasket
+                Cyl("Wastebasket", M("#4A3320", 0.1f), 1.1f, 1.0f, 0f, 0.14f, 0.2f, false);
+                // Floor plant
+                Plant(3.5f, 2.5f);
+                // Guest chair
+                Cube("GuestChairSeat", M("#6E2F37", 0.2f), 2.0f, 0.5f, 0f, 0.3f, 0.22f, 0.3f);
+                Cube("GuestChairBack", M("#6E2F37", 0.2f), 2.0f, 0.35f, 0.22f, 0.3f, 0.22f, 0.04f, false);
+                // Curtains
+                Curtains(1.5f, 0.08f, 0.7f, "#2E3F5C");
+                // Small rug in front of desk
+                Rug(0.9f, 1.5f, 0.4f, 0.5f, "#5E2E34");
+                // Coat hook with hat
+                Cube("CoatHook", M("#2B2B2E"), 3.6f, 1.5f, 0.75f, 0.06f, 0.04f, 0.04f, false);
             }
 
             void Cellar()
             {
+                CeilingFixture("industrial");
+                // Crates
                 Cube("CrateA", M("#7C5A3A", 0.1f), 0.25f, 0.25f, 0f, 0.32f, 0.32f, 0.32f);
                 Cube("CrateB", M("#8A6A44", 0.1f), 0.25f, 0.25f, 0.32f, 0.26f, 0.26f, 0.26f, false, 18f);
+                Cube("CrateC", M("#6A5A3A", 0.1f), 0.6f, 0.25f, 0f, 0.3f, 0.28f, 0.3f);
+                Cube("CrateD", M("#9A7A54", 0.1f), 1.5f, 2.5f, 0f, 0.28f, 0.28f, 0.28f);
+                // Barrels
                 Cyl("BarrelS", M("#5B3F2A"), 2.72f, 0.27f, 0f, 0.38f, 0.5f);
                 Cyl("BarrelNW", M("#5B3F2A"), 0.3f, d - 0.28f, 0f, 0.38f, 0.5f);
                 Cyl("BarrelNE", M("#5B3F2A"), 2.72f, d - 0.28f, 0f, 0.38f, 0.5f);
+                Cyl("BarrelSmall", M("#7C5A3A"), 1.0f, d - 0.3f, 0f, 0.28f, 0.4f);
+                // Wine racks with bottles
                 Cube("WineRackW", M("#4A3320"), 0.2f, 1.6f, 0f, 0.24f, 0.7f, 1.0f);
                 Cube("WineRackE", M("#4A3320"), 2.8f, 1.6f, 0f, 0.24f, 0.7f, 1.0f);
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < 5; i++)
                 {
-                    Cyl("BottleW" + i, M("#2F5A3A", 0.5f), 0.2f, 1.25f + i * 0.2f, 0.7f, 0.07f, 0.2f, false);
-                    Cyl("BottleE" + i, M("#5A2F3A", 0.5f), 2.8f, 1.25f + i * 0.2f, 0.7f, 0.07f, 0.2f, false);
+                    Cyl("BottleW" + i, M("#2F5A3A", 0.5f), 0.2f, 1.2f + i * 0.18f, 0.7f, 0.07f, 0.2f, false);
+                    Cyl("BottleE" + i, M("#5A2F3A", 0.5f), 2.8f, 1.2f + i * 0.18f, 0.7f, 0.07f, 0.2f, false);
                 }
                 Ball("Lantern", kit.Glow("#FFB45A", 2f), 0.2f, 1.6f, 0.82f, 0.18f);
+                // Cobwebs
+                Cube("Cobweb1", M("#A8A898", 0.02f), 2.9f, 2.9f, 0.9f, 0.2f, 0.15f, 0.01f, false);
+                Cube("Cobweb2", M("#A8A898", 0.02f), 0.1f, 2.9f, 0.85f, 0.15f, 0.12f, 0.01f, false);
+                // Dusty sacks
+                Ball("Sack1", M("#7C6A54", 0.05f), 1.5f, 0.3f, 0.15f, 0.22f);
+                Ball("Sack2", M("#6A5A44", 0.05f), 1.8f, 0.3f, 0.12f, 0.18f);
+                // Old tools
+                Cyl("ShovelHandle", M("#B8923F", 0.1f), 2.4f, 0.15f, 0f, 0.02f, 0.75f, false);
+                Cube("ShovelBlade", M("#6A6F73", 0.3f), 2.4f, 0.15f, 0.75f, 0.1f, 0.08f, 0.015f, false);
+                // Old chair
+                Cube("OldChairSeat", M("#6A5A3A", 0.1f), 1.9f, 1.8f, 0f, 0.24f, 0.2f, 0.24f);
+                Cube("OldChairBack", M("#6A5A3A", 0.1f), 1.9f, 1.92f, 0.2f, 0.24f, 0.2f, 0.03f, false);
+                // Rope coil on floor
+                Cyl("RopeCoil", M("#9A8A6A", 0.1f), 2.1f, 2.5f, 0f, 0.18f, 0.06f, false);
+                // Dusty shelf with jars
+                Cube("CellarShelf", M("#4A3320"), 1.5f, 0.15f, 0.5f, 1.0f, 0.03f, 0.22f, false);
+                for (int i = 0; i < 4; i++)
+                    Cyl("Jar" + i, M("#A8B8C8", 0.3f), 1.2f + i * 0.22f, 0.15f, 0.53f, 0.06f, 0.1f, false);
             }
         }
     }
 
-    // Detajet e rolit mbi figurë (shënues ose banor). Koordinatat janë ato të SuspectMarker:
-    // trupi y 0–0.8 (rrezja 0.18), koka y 0.81–1.09. Pjesët janë rrathë/kapele që duken nga çdo kënd,
-    // pasi kamera rrotullohet.
     static class RoleLook
     {
         public static GameObject Attach(Transform figure, string suspectId, HouseDressing.Kit kit)
@@ -490,39 +1080,36 @@ namespace Alibi.Unity
             var t = g.transform;
             switch (suspectId)
             {
-                case "A": // Arta, kuzhiniere: kapelë kuzhinieri + përparëse e bardhë
-                    Disc(t, "Apron", 0.36f, 0.395f, 0.32f, kit.Mat("#EDE6D3", 0.1f));
-                    Disc(t, "ToqueBase", 1.19f, 0.27f, 0.16f, kit.Mat("#F4F1E8", 0.1f));
-                    Dome(t, "ToquePuff", 1.32f, 0.36f, 0.2f, 0.36f, kit.Mat("#F4F1E8", 0.1f));
+                case "A": // Arta, kuzhiniere
+                    Disc(t, "Apron", 0.95f, 0.36f, 0.14f, kit.Mat("#EDE6D3", 0.1f));
+                    Disc(t, "ToqueBase", 1.72f, 0.24f, 0.06f, kit.Mat("#F4F1E8", 0.1f));
+                    Dome(t, "ToquePuff", 1.82f, 0.28f, 0.16f, 0.28f, kit.Mat("#F4F1E8", 0.1f));
                     break;
-                case "B": // Blerimi, shofer: kapele shoferi + rrip lëkure
-                    Dome(t, "CapDome", 1.05f, 0.31f, 0.17f, 0.31f, kit.Mat("#1F2A44", 0.2f));
-                    Disc(t, "CapBrim", 0.985f, 0.38f, 0.016f, kit.Mat("#141A2C", 0.3f));
-                    Disc(t, "CapBand", 1.0f, 0.305f, 0.035f, kit.Mat("#C9A44C", 0.5f));
-                    Disc(t, "Belt", 0.38f, 0.375f, 0.035f, kit.Mat("#17130B", 0.3f));
+                case "B": // Blerimi, shofer
+                    Dome(t, "CapDome", 1.66f, 0.24f, 0.1f, 0.24f, kit.Mat("#1F2A44", 0.2f));
+                    Disc(t, "CapBrim", 1.62f, 0.3f, 0.016f, kit.Mat("#141A2C", 0.3f));
+                    Disc(t, "CapBand", 1.63f, 0.245f, 0.025f, kit.Mat("#C9A44C", 0.5f));
+                    Disc(t, "Belt", 0.88f, 0.32f, 0.025f, kit.Mat("#17130B", 0.3f));
                     break;
-                case "D": // Drita, sekretare: dosje në dorë + topuz
-                    Slab(t, "Folder", new Vector3(0.25f, 0.5f, 0f), new Vector3(0.05f, 0.3f, 0.22f), kit.Mat("#D8B365", 0.1f));
-                    Slab(t, "FolderPaper", new Vector3(0.252f, 0.52f, 0f), new Vector3(0.05f, 0.27f, 0.19f), kit.Mat("#F4F1E8", 0.05f));
-                    Dome(t, "Hand", new Vector3(0.23f, 0.34f, 0f), 0.1f, kit.Mat("#E3B58F", 0.2f));
-                    Dome(t, "HairBun", 1.12f, 0.13f, 0.13f, 0.13f, kit.Mat("#3B2A22", 0.2f));
+                case "D": // Drita, sekretare
+                    Slab(t, "Folder", new Vector3(0.3f, 0.95f, 0f), new Vector3(0.04f, 0.24f, 0.18f), kit.Mat("#D8B365", 0.1f));
+                    Slab(t, "FolderPaper", new Vector3(0.302f, 0.97f, 0f), new Vector3(0.04f, 0.21f, 0.15f), kit.Mat("#F4F1E8", 0.05f));
+                    Dome(t, "HairBun", 1.68f, 0.1f, 0.1f, 0.1f, kit.Mat("#3B2A22", 0.2f));
                     break;
-                case "E": // Elmazi, kopshtar: kapelë kashte + përparëse jeshile
-                    Disc(t, "Apron", 0.34f, 0.395f, 0.3f, kit.Mat("#3F6B3A", 0.1f));
-                    Disc(t, "StrawBrim", 1.02f, 0.52f, 0.02f, kit.Mat("#D9C27A", 0.1f));
-                    Disc(t, "StrawCrown", 1.07f, 0.26f, 0.08f, kit.Mat("#D9C27A", 0.1f));
+                case "E": // Elmazi, kopshtar
+                    Disc(t, "Apron", 0.95f, 0.34f, 0.12f, kit.Mat("#3F6B3A", 0.1f));
+                    Disc(t, "StrawBrim", 1.68f, 0.4f, 0.02f, kit.Mat("#D9C27A", 0.1f));
+                    Disc(t, "StrawCrown", 1.72f, 0.22f, 0.06f, kit.Mat("#D9C27A", 0.1f));
                     break;
-                case "F": // Fatmiri, nipi i pronarit: shall bordo + zinxhir ore ari + flokë
-                    Disc(t, "Scarf", 0.7f, 0.34f, 0.09f, kit.Mat("#7A2433", 0.2f));
-                    Slab(t, "ScarfTail", new Vector3(0f, 0.52f, -0.17f), new Vector3(0.07f, 0.24f, 0.03f), kit.Mat("#7A2433", 0.2f));
-                    Disc(t, "WatchChain", 0.45f, 0.37f, 0.012f, kit.Mat("#C9A44C", 0.6f));
-                    Dome(t, "Hair", 1.03f, 0.3f, 0.14f, 0.3f, kit.Mat("#3B2A22", 0.2f));
+                case "F": // Fatmiri, nipi i pronarit
+                    Disc(t, "Scarf", 1.38f, 0.26f, 0.06f, kit.Mat("#7A2433", 0.2f));
+                    Slab(t, "ScarfTail", new Vector3(0f, 1.2f, -0.14f), new Vector3(0.06f, 0.18f, 0.03f), kit.Mat("#7A2433", 0.2f));
+                    Disc(t, "WatchChain", 1.0f, 0.3f, 0.01f, kit.Mat("#C9A44C", 0.6f));
                     break;
-                case "G": // Genta, ekonomiste: libër llogarish + varëse ari + flokë
-                    Slab(t, "Ledger", new Vector3(-0.25f, 0.5f, 0f), new Vector3(0.07f, 0.27f, 0.2f), kit.Mat("#1F3D2E", 0.1f));
-                    Slab(t, "LedgerSpine", new Vector3(-0.285f, 0.5f, 0f), new Vector3(0.012f, 0.27f, 0.2f), kit.Mat("#C9A44C", 0.5f));
-                    Disc(t, "Pendant", 0.72f, 0.3f, 0.012f, kit.Mat("#C9A44C", 0.6f));
-                    Dome(t, "Hair", 1.02f, 0.31f, 0.2f, 0.31f, kit.Mat("#5A4630", 0.2f));
+                case "G": // Genta, ekonomiste
+                    Slab(t, "Ledger", new Vector3(-0.3f, 0.95f, 0f), new Vector3(0.06f, 0.22f, 0.16f), kit.Mat("#1F3D2E", 0.1f));
+                    Slab(t, "LedgerSpine", new Vector3(-0.33f, 0.95f, 0f), new Vector3(0.01f, 0.22f, 0.16f), kit.Mat("#C9A44C", 0.5f));
+                    Disc(t, "Pendant", 1.38f, 0.2f, 0.01f, kit.Mat("#C9A44C", 0.6f));
                     break;
                 default:
                     Object.Destroy(g);
@@ -552,7 +1139,6 @@ namespace Alibi.Unity
         }
     }
 
-    // Shënuesit "e mundshëm" janë të tejdukshëm, ndaj detajet e rolit shfaqen vetëm kur janë të konfirmuar.
     public sealed class RoleLookToggle : MonoBehaviour
     {
         public SuspectMarker Marker;
@@ -573,12 +1159,12 @@ namespace Alibi.Unity
         public readonly List<ResidentFigure> Residents = new List<ResidentFigure>();
     }
 
-    // Figurë banori që qëndron në dhomën e vet. Nuk ka collider, ndaj nuk pengon klikimet.
     public sealed class ResidentFigure : MonoBehaviour
     {
         public HouseLife Life;
         public int Suspect;
         public GameObject Visual;
+        public GameObject NameLabel;
 
         void Update()
         {
@@ -591,6 +1177,17 @@ namespace Alibi.Unity
                 default: show = true; break;
             }
             if (Visual.activeSelf != show) Visual.SetActive(show);
+
+            // Billboard: make name label always face the camera
+            if (NameLabel != null && NameLabel.activeSelf)
+            {
+                var cam = Camera.main;
+                if (cam != null)
+                {
+                    NameLabel.transform.rotation = Quaternion.LookRotation(
+                        NameLabel.transform.position - cam.transform.position);
+                }
+            }
         }
 
         bool MarkerShown()

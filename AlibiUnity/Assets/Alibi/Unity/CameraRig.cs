@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 
 namespace Alibi.Unity
 {
-    public enum CameraMode { Overview, FirstPerson }
+    public enum CameraMode { Overview, FirstPerson, ThirdPerson, TopDown }
 
     public sealed class CameraRig : MonoBehaviour
     {
@@ -28,6 +28,11 @@ namespace Alibi.Unity
         public float EyeHeight = 1.65f;
         public float CollisionRadius = 0.3f;
 
+        // Third-person settings
+        public float TpDistance = 3.5f;
+        public float TpHeight = 0.5f;
+        public Transform PlayerBody;
+
         float currentYaw;
         float currentSize = 8f;
         Vector3 currentPos;
@@ -38,13 +43,21 @@ namespace Alibi.Unity
         Vector3 fpPosition;
         float fpYaw;
         float fpPitch;
-        bool fpLooking;
+
         float transitionT;
         Vector3 transitionFrom;
         Quaternion transitionFromRot;
         float transitionFromSize;
         bool transitioning;
         const float TransitionDuration = 0.6f;
+
+        // Turn speed for A/D rotation (degrees per second)
+        public float TurnSpeed = 120f;
+
+        // Public accessors for GameManager proximity checks
+        public Vector3 FpPosition { get { return fpPosition; } }
+        public float FpYaw { get { return fpYaw; } }
+        public bool IsCursorLocked { get { return false; } }
 
         public static CameraRig Create(Transform parent, Color background)
         {
@@ -70,11 +83,14 @@ namespace Alibi.Unity
         public void SetMode(CameraMode mode)
         {
             if (mode == Mode) return;
-            if (mode == CameraMode.FirstPerson)
+            if (mode == CameraMode.FirstPerson || mode == CameraMode.ThirdPerson || mode == CameraMode.TopDown)
             {
-                fpPosition = Target.center + new Vector3(0, EyeHeight, 0);
-                fpYaw = currentYaw;
-                fpPitch = 0f;
+                if (Mode == CameraMode.Overview)
+                {
+                    fpPosition = Target.center + new Vector3(0, EyeHeight, 0);
+                    fpYaw = currentYaw;
+                    fpPitch = 0f;
+                }
             }
             transitioning = true;
             transitionT = 0f;
@@ -82,6 +98,7 @@ namespace Alibi.Unity
             transitionFromRot = Cam.transform.rotation;
             transitionFromSize = Cam.fieldOfView;
             Mode = mode;
+            UpdatePlayerBody();
         }
 
         public void EnterFirstPerson(Vector3 worldPos)
@@ -95,6 +112,21 @@ namespace Alibi.Unity
             transitionFromRot = Cam.transform.rotation;
             transitionFromSize = Cam.fieldOfView;
             Mode = CameraMode.FirstPerson;
+            UpdatePlayerBody();
+        }
+
+        public void EnterThirdPerson(Vector3 worldPos)
+        {
+            fpPosition = new Vector3(worldPos.x, worldPos.y + EyeHeight, worldPos.z);
+            fpYaw = currentYaw;
+            fpPitch = 0f;
+            transitioning = true;
+            transitionT = 0f;
+            transitionFrom = Cam.transform.position;
+            transitionFromRot = Cam.transform.rotation;
+            transitionFromSize = Cam.fieldOfView;
+            Mode = CameraMode.ThirdPerson;
+            UpdatePlayerBody();
         }
 
         public void ExitFirstPerson()
@@ -105,11 +137,20 @@ namespace Alibi.Unity
             transitionFromRot = Cam.transform.rotation;
             transitionFromSize = Cam.fieldOfView;
             Mode = CameraMode.Overview;
+            UpdatePlayerBody();
+        }
+
+        public void TogglePersonView()
+        {
+            if (Mode == CameraMode.FirstPerson)
+                SetMode(CameraMode.ThirdPerson);
+            else if (Mode == CameraMode.ThirdPerson)
+                SetMode(CameraMode.FirstPerson);
         }
 
         public void RotateStep(int dir)
         {
-            if (Mode == CameraMode.FirstPerson)
+            if (Mode == CameraMode.FirstPerson || Mode == CameraMode.ThirdPerson || Mode == CameraMode.TopDown)
                 fpYaw += 45f * dir;
             else
                 Yaw += 90f * dir;
@@ -121,6 +162,10 @@ namespace Alibi.Unity
             {
                 Cam.fieldOfView = Mathf.Clamp(Cam.fieldOfView / factor, 40f, 90f);
             }
+            else if (Mode == CameraMode.ThirdPerson)
+            {
+                TpDistance = Mathf.Clamp(TpDistance / factor, 1.5f, 8f);
+            }
             else
             {
                 Zoom = Mathf.Clamp(Zoom * factor, 0.7f, 2.6f);
@@ -129,7 +174,7 @@ namespace Alibi.Unity
 
         public void ResetView()
         {
-            if (Mode == CameraMode.FirstPerson)
+            if (Mode == CameraMode.FirstPerson || Mode == CameraMode.ThirdPerson || Mode == CameraMode.TopDown)
             {
                 ExitFirstPerson();
             }
@@ -140,9 +185,9 @@ namespace Alibi.Unity
 
         public void FocusOn(Vector3 world, float amount)
         {
-            if (Mode == CameraMode.FirstPerson)
+            if (Mode == CameraMode.FirstPerson || Mode == CameraMode.ThirdPerson || Mode == CameraMode.TopDown)
             {
-                EnterFirstPerson(new Vector3(world.x, world.y, world.z));
+                fpPosition = new Vector3(world.x, world.y + EyeHeight, world.z);
             }
             else
             {
@@ -150,6 +195,10 @@ namespace Alibi.Unity
                 Pan.y = 0;
             }
         }
+
+        // Stubs so GameManager compiles (cursor lock removed — no mouse look)
+        public void LockCursor() { }
+        public void UnlockCursor() { }
 
         Rect ScreenFrame()
         {
@@ -160,64 +209,42 @@ namespace Alibi.Unity
             return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
         }
 
-        static bool PointerOverUI()
-        {
-            return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-        }
-
         void UpdateFirstPerson()
         {
             float dt = Time.unscaledDeltaTime;
 
-            // Mouse look (right mouse button held)
-#if ENABLE_INPUT_SYSTEM
-            var mouse = Mouse.current;
-            var kb = Keyboard.current;
-            if (mouse != null && mouse.rightButton.isPressed && !PointerOverUI())
-            {
-                fpYaw += mouse.delta.x.ReadValue() * LookSensitivity * 0.15f;
-                fpPitch -= mouse.delta.y.ReadValue() * LookSensitivity * 0.15f;
-                fpPitch = Mathf.Clamp(fpPitch, -80f, 80f);
-                fpLooking = true;
-            }
-            else
-            {
-                fpLooking = false;
-            }
+            // Deselect any focused UI element so it doesn't eat keyboard
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null)
+                EventSystem.current.SetSelectedGameObject(null);
 
-            // WASD movement
+            // --- NO MOUSE LOOK — keyboard only ---
+            // A/D and Left/Right = turn, W/S and Up/Down = forward/backward
+            float turn = 0f;
             Vector3 move = Vector3.zero;
+
+#if ENABLE_INPUT_SYSTEM
+            var kb = Keyboard.current;
             if (kb != null)
             {
-                if (kb.wKey.isPressed) move.z += 1f;
-                if (kb.sKey.isPressed) move.z -= 1f;
-                if (kb.aKey.isPressed) move.x -= 1f;
-                if (kb.dKey.isPressed) move.x += 1f;
-                if (kb.spaceKey.isPressed) move.y += 1f;
-                if (kb.leftShiftKey.isPressed) move.y -= 1f;
+                if (kb.wKey.isPressed || kb.upArrowKey.isPressed) move.z += 1f;
+                if (kb.sKey.isPressed || kb.downArrowKey.isPressed) move.z -= 1f;
+                if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) turn -= 1f;
+                if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) turn += 1f;
             }
 #else
-            if (Input.GetMouseButton(1) && !PointerOverUI())
-            {
-                fpYaw += Input.GetAxis("Mouse X") * LookSensitivity * 2f;
-                fpPitch -= Input.GetAxis("Mouse Y") * LookSensitivity * 2f;
-                fpPitch = Mathf.Clamp(fpPitch, -80f, 80f);
-                fpLooking = true;
-            }
-            else
-            {
-                fpLooking = false;
-            }
-
-            Vector3 move = Vector3.zero;
-            if (Input.GetKey(KeyCode.W)) move.z += 1f;
-            if (Input.GetKey(KeyCode.S)) move.z -= 1f;
-            if (Input.GetKey(KeyCode.A)) move.x -= 1f;
-            if (Input.GetKey(KeyCode.D)) move.x += 1f;
-            if (Input.GetKey(KeyCode.Space)) move.y += 1f;
-            if (Input.GetKey(KeyCode.LeftShift)) move.y -= 1f;
+            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) move.z += 1f;
+            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) move.z -= 1f;
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) turn -= 1f;
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) turn += 1f;
 #endif
 
+            // Apply turning
+            if (Mathf.Abs(turn) > 0.01f)
+            {
+                fpYaw += turn * TurnSpeed * dt;
+            }
+
+            // Apply movement (forward/backward only, in facing direction)
             if (move.sqrMagnitude > 0.01f)
             {
                 move.Normalize();
@@ -241,6 +268,49 @@ namespace Alibi.Unity
             }
         }
 
+        void ComputeThirdPerson(out Vector3 pos, out Quaternion rot)
+        {
+            var lookTarget = fpPosition + Vector3.down * 0.4f;
+            float elevation = 20f + fpPitch * 0.3f;
+            var camDir = Quaternion.Euler(elevation, fpYaw + 180f, 0f) * Vector3.forward;
+            var desired = lookTarget + camDir * TpDistance + Vector3.up * TpHeight;
+
+            RaycastHit hit;
+            float dist = TpDistance + TpHeight;
+            if (Physics.SphereCast(lookTarget, 0.2f, (desired - lookTarget).normalized, out hit, dist))
+            {
+                if (hit.distance > 0.3f)
+                    desired = lookTarget + (desired - lookTarget).normalized * (hit.distance - 0.2f);
+                else
+                    desired = lookTarget + (desired - lookTarget).normalized * 0.3f;
+            }
+
+            pos = desired;
+            rot = Quaternion.LookRotation(lookTarget - desired);
+        }
+
+        void ComputeTopDown(out Vector3 pos, out Quaternion rot)
+        {
+            // Place camera directly above and slightly behind the player
+            float height = 8f;
+            float backDist = 3f;
+            var back = Quaternion.Euler(0, fpYaw, 0) * Vector3.back;
+            pos = fpPosition + Vector3.up * height + back * backDist;
+            rot = Quaternion.LookRotation(fpPosition - pos);
+        }
+
+        void UpdatePlayerBody()
+        {
+            if (PlayerBody == null) return;
+            bool visible = Mode == CameraMode.ThirdPerson || Mode == CameraMode.TopDown;
+            PlayerBody.gameObject.SetActive(visible);
+            if (visible)
+            {
+                PlayerBody.position = fpPosition + Vector3.down * EyeHeight;
+                PlayerBody.rotation = Quaternion.Euler(0f, fpYaw, 0f);
+            }
+        }
+
         void LateUpdate()
         {
             if (Cam == null) return;
@@ -248,6 +318,11 @@ namespace Alibi.Unity
             if (transitioning)
             {
                 transitionT += Time.unscaledDeltaTime / TransitionDuration;
+
+                // Allow keyboard movement even during transition so player can move immediately
+                if (Mode == CameraMode.FirstPerson || Mode == CameraMode.ThirdPerson || Mode == CameraMode.TopDown)
+                    UpdateFirstPerson();
+
                 float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(transitionT));
 
                 Vector3 targetPos;
@@ -258,6 +333,16 @@ namespace Alibi.Unity
                 {
                     targetPos = fpPosition;
                     targetRot = Quaternion.Euler(fpPitch, fpYaw, 0f);
+                    targetFov = 65f;
+                }
+                else if (Mode == CameraMode.ThirdPerson)
+                {
+                    ComputeThirdPerson(out targetPos, out targetRot);
+                    targetFov = 65f;
+                }
+                else if (Mode == CameraMode.TopDown)
+                {
+                    ComputeTopDown(out targetPos, out targetRot);
                     targetFov = 65f;
                 }
                 else
@@ -271,7 +356,10 @@ namespace Alibi.Unity
                     Quaternion.Slerp(transitionFromRot, targetRot, t));
                 Cam.fieldOfView = Mathf.Lerp(transitionFromSize, targetFov, t);
 
-                if (transitionT >= 1f) transitioning = false;
+                if (transitionT >= 1f)
+                {
+                    transitioning = false;
+                }
                 return;
             }
 
@@ -280,6 +368,24 @@ namespace Alibi.Unity
                 UpdateFirstPerson();
                 var rot = Quaternion.Euler(fpPitch, fpYaw, 0f);
                 Cam.transform.SetPositionAndRotation(fpPosition, rot);
+            }
+            else if (Mode == CameraMode.ThirdPerson)
+            {
+                UpdateFirstPerson(); // same WASD movement
+                UpdatePlayerBody();
+                Vector3 pos;
+                Quaternion rot;
+                ComputeThirdPerson(out pos, out rot);
+                Cam.transform.SetPositionAndRotation(pos, rot);
+            }
+            else if (Mode == CameraMode.TopDown)
+            {
+                UpdateFirstPerson();
+                UpdatePlayerBody();
+                Vector3 pos;
+                Quaternion rot;
+                ComputeTopDown(out pos, out rot);
+                Cam.transform.SetPositionAndRotation(pos, rot);
             }
             else
             {
@@ -311,7 +417,6 @@ namespace Alibi.Unity
             float verticalHalf = sceneAspect > frameAspect ? halfW / frameAspect : halfH;
             size = verticalHalf * 1.12f / Zoom;
 
-            // Perspective: position camera to fit the scene in view
             float fovRad = Cam.fieldOfView * Mathf.Deg2Rad * 0.5f;
             float dist = size / Mathf.Tan(fovRad);
             dist = Mathf.Max(dist, 10f);

@@ -1,373 +1,1100 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Alibi.Core;
+// MainMenuController.cs — Alibi kryefaqja (redizajnuar v3)
+// Procedural UI: titull + butona (majtas), siluet detektivi me rim-light (djathtas)
+// Lupe SDF, rreze drite, grimca ari — pa prefab, pa asset
+using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Alibi.Unity
 {
-    public sealed class MainMenuController : MonoBehaviour
+    public class MainMenuController : MonoBehaviour
     {
-        Canvas canvas;
-        RectTransform screen, overlay, frame;
-        CameraRig rig;
-        VillaView villa;
-        CaseDefinition showcase;
-        int showcaseTime;
-        float nextTick;
-        Task<GenerationResult> genTask;
-        Text genStatus;
-        float genStarted;
-        int pickMode;
-        int seed;
+        // ── Cache per animacion ──
+        Canvas     _canvas;
+        RawImage   _lensGlow;
+        float      _glowT;
 
-        static readonly string[] ModeNames = { "Niveli 1 · Vrasja", "Niveli 2 · Vrasja", "Niveli 3 · Sabotimi", "Niveli 4 · Vjedhja" };
-        static readonly string[] ModeDesc =
-        {
-            "4 të dyshuar, 5 dhoma, 3 orë, buxhet 12. Pa graf lëvizjeje.",
-            "5 të dyshuar, 7 dhoma me graf, 4 orë, buxhet 12. Askush nuk teleportohet.",
-            "4 të dyshuar, 7 dhoma, 3 orë, buxhet 12. Ora e krimit nuk dihet: provo personin dhe orën.",
-            "6 të dyshuar, 9 dhoma, 5 orë. Vjedhja: dosja lëviz me hajnin, Q6 për sendin, kalimi Biblioteka–Zyra (R06)."
-        };
-        static readonly string[] ModeNotes =
-        {
-            "Rast i shpejtë për të mësuar tabelën.",
-            "Kush nuk arrin dot në dhomën e krimit me kalime përjashtohet (R02, R08).",
-            "Variant eksperimental: me parametrat e plotë të nivelit 3 (5 të dyshuar, 5 orë, buxhet 11) par-i i llogaritur del 18–25, prandaj ky variant është i ngushtuar.",
-            "Karta 4 është e fiksuar (seed 404). Gjeneratori për Vjedhjen mbetet opsional."
-        };
+        // ── Grimca (particles) ──
+        const int  PCount = 22;
+        RectTransform[] _pRTs;
+        float[]  _pSpeeds;
+        float[]  _pDrifts;
+
+        // ── Sprite rrethi (generohet 1 here, riperdoret) ──
+        static Sprite _circleSpr;
+
+        // ── Level-select overlay ref ──
+        GameObject _levelOverlay;
+
+        // ==============================================================
+        //  LIFECYCLE
+        // ==============================================================
 
         void Start()
         {
-            seed = UnityEngine.Random.Range(1000, 9999);
-            showcase = LevelCards.Card2();
-            villa = MapBuilder.Build(transform, showcase);
-            HouseDressing.Build(villa);
-            HouseDressing.SetResidentsMode(villa, ResidentsMode.Never); // vitrina e menysë ka vetë figurat e saj
-            SceneSetup.Lights(transform, villa.Bounds);
-            rig = CameraRig.Create(transform, Theme.Night);
-            rig.Target = villa.Bounds;
-            rig.Orbit = true;
-            rig.OrbitSpeed = 5f;
-            rig.Zoom = 0.95f;
-            villa.Rig = rig;
-            AlibiFlow.DisableForeignCamerasAndLights(transform);
-            canvas = AlibiFlow.CreateCanvas(transform, "MenuCanvas", 10);
-            var root = (RectTransform)canvas.transform;
-            frame = UI.Rect(root, "ShowcaseFrame");
-            frame.anchorMin = new Vector2(0, 0);
-            frame.anchorMax = new Vector2(1, 1);
-            frame.offsetMin = new Vector2(760, 120);
-            frame.offsetMax = new Vector2(-60, -80);
-            rig.Frame = frame;
-            screen = UI.Rect(root, "Screen");
-            UI.Stretch(screen, 0, 0, 0, 0);
-            overlay = UI.Rect(root, "Overlay");
-            UI.Stretch(overlay, 0, 0, 0, 0);
-            ShowHome();
-            TickShowcase();
-        }
-
-        void TickShowcase()
-        {
-            for (int s = 0; s < showcase.N; s++)
-            {
-                for (int r = 0; r < showcase.RoomCount; r++)
-                {
-                    villa.Markers[s, r].SetState(showcase.Truth[s][showcaseTime] == r ? MarkerState.Confirmed : MarkerState.Hidden, false);
-                }
-            }
-            villa.SetCrimeActive(showcaseTime == showcase.CrimeTime);
-            nextTick = Time.time + 2.6f;
+            HideSceneObjects();
+            Build();
         }
 
         void Update()
         {
-            if (villa != null && Time.time > nextTick && genTask == null)
+            // Pulsi i drites ne lentet e lupes
+            if (_lensGlow != null)
             {
-                showcaseTime = (showcaseTime + 1) % showcase.T;
-                TickShowcase();
+                _glowT += Time.deltaTime;
+                float a = 0.22f + 0.16f * Mathf.Sin(_glowT * 1.2f);
+                _lensGlow.color = Theme.WithAlpha(Theme.Gold, a);
             }
-            if (genTask != null)
+
+            // Grimcat qe notojne lart
+            if (_pRTs != null)
             {
-                if (genStatus != null)
+                for (int i = 0; i < _pRTs.Length; i++)
                 {
-                    int dots = (int)((Time.time - genStarted) * 3f) % 4;
-                    genStatus.text = "seed " + seed + " · CaseGenerator + CspSolver kontrollojnë unikësinë, ParPolicy llogarit par-in" + new string('.', dots);
-                }
-                if (genTask.IsCompleted)
-                {
-                    var task = genTask;
-                    genTask = null;
-                    if (task.IsFaulted || task.Result == null || task.Result.Case == null)
+                    if (_pRTs[i] == null) continue;
+                    var pos = _pRTs[i].anchoredPosition;
+                    pos.y += _pSpeeds[i] * Time.deltaTime;
+                    pos.x += _pDrifts[i] * Time.deltaTime;
+                    if (pos.y > 1200f)
                     {
-                        UI.Clear(overlay);
-                        ShowNewCase();
-                        Panels.Toast(canvas.transform, "Gjeneratori nuk gjeti rast të vlefshëm. Provo një seed tjetër.", Theme.Red, 4f);
-                        return;
+                        pos.y = Random.Range(-80f, -20f);
+                        pos.x = Random.Range(60f, 1860f);
                     }
-                    AlibiFlow.StartCase(task.Result.Case);
+                    _pRTs[i].anchoredPosition = pos;
                 }
             }
         }
 
-        static UIButton MenuButton(Transform parent, string title, string sub, string icon, bool primary, Action onClick, float y)
+        // ==============================================================
+        //  FSHEH OBJEKTET 3D TE SKENES
+        // ==============================================================
+
+        void HideSceneObjects()
         {
-            var b = UI.Button(parent, null, primary ? BtnStyle.Primary : BtnStyle.Chip, onClick, 17, 12);
-            UI.Place(b.Rect, 0, y, 500, 78);
-            if (!primary)
-            {
-                b.Background.color = new Color(0.06f, 0.07f, 0.1f, 0.92f);
-                b.Border.color = Theme.WithAlpha(Theme.Gold, 0.15f);
-            }
-            var iconBg = UI.Panel(b.Rect, "Icon", primary ? Theme.WithAlpha(Theme.Ink, 0.15f) : Theme.WithAlpha(Theme.Gold, 0.12f), 12, false);
-            UI.Place(iconBg.rectTransform, 16, 18, 42, 42);
-            var il = UI.Label(iconBg.transform, icon, Theme.Serif, 22, primary ? Theme.Ink : Theme.Gold, TextAnchor.MiddleCenter);
-            UI.Stretch(il.rectTransform, 0, 0, 0, 0);
-            UI.LabelAt(b.Rect, title, Theme.SansSemi, 19, primary ? Theme.Ink : Theme.Text, 70, 14, 400, 26);
-            UI.LabelAt(b.Rect, sub, Theme.Sans, 14, primary ? Theme.Hex("#3D3017") : Theme.Muted, 70, 42, 420, 22);
-            return b;
+            foreach (var cam in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+                cam.gameObject.SetActive(false);
+
+            var camGo = new GameObject("_MenuCam");
+            var c     = camGo.AddComponent<Camera>();
+            c.clearFlags      = CameraClearFlags.SolidColor;
+            // Midnight blue — me i pasur se zi i thjeshtë
+            c.backgroundColor = new Color(0.035f, 0.040f, 0.065f);
+            c.cullingMask     = 0;
         }
 
-        void ShowHome()
+        // ==============================================================
+        //  NDERTO MENU-NE
+        // ==============================================================
+
+        void Build()
         {
-            UI.Clear(screen);
-            rig.Frame = frame;
+            _canvas = gameObject.AddComponent<Canvas>();
+            _canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+            _canvas.sortingOrder = 100;
 
-            // Decorative villa frame border
-            var frameBorder = UI.Card(screen, "FrameBorder", new Color(0, 0, 0, 0), Theme.WithAlpha(Theme.Gold, 0.12f), 14);
-            frameBorder.rectTransform.anchorMin = new Vector2(0, 0);
-            frameBorder.rectTransform.anchorMax = new Vector2(1, 1);
-            frameBorder.rectTransform.offsetMin = new Vector2(748, 108);
-            frameBorder.rectTransform.offsetMax = new Vector2(-48, -68);
-            frameBorder.raycastTarget = false;
+            var scaler = gameObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode        = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight  = 0.5f;
 
-            var left = UI.Rect(screen, "Left");
-            left.anchorMin = new Vector2(0, 0);
-            left.anchorMax = new Vector2(0, 1);
-            left.pivot = new Vector2(0, 1);
-            left.offsetMin = new Vector2(64, 40);
-            left.offsetMax = new Vector2(64 + 660, -64);
-            float y = 0;
+            gameObject.AddComponent<GraphicRaycaster>();
 
-            // Kicker with decorative line
-            var kickerLine = UI.Panel(left, "KickerLine", Theme.WithAlpha(Theme.Gold, 0.3f), 0, false);
-            UI.Place(kickerLine.rectTransform, 0, 10, 36, 1);
-            UI.LabelAt(left, "LOJË MISTERI DEDUKTIVE · 1 LOJTAR · OFFLINE", Theme.Mono, 14, Theme.Gold, 44, y, 600, 22);
-            y += 32;
+            var root = _canvas.GetComponent<RectTransform>();
 
-            var title = UI.LabelAt(left, "ALIBI", Theme.Serif, 150, Theme.Parchment, -6, y, 640, 150);
-            title.horizontalOverflow = HorizontalWrapMode.Overflow;
-            y += 150;
-            y += Panels.Paragraph(left, "Çdo dëshmi është një kufizim. Fajtori gënjen, por gënjeshtra e tij del në dritë sapo dy deklarata nuk mund të jenë të vërteta njëkohësisht.", Theme.Sans, 20, Theme.Text2, 0, y, 540) + 24;
+            // Background midnight blue
+            var bg = SolidRect(root, "bg", new Color(0.040f, 0.045f, 0.070f));
+            Stretch(bg);
 
-            if (!string.IsNullOrEmpty(AlibiFlow.MenuNote))
-            {
-                var note = UI.Card(left, "Note", Theme.Hex("#141924"), Theme.WithAlpha(Theme.Gold, 0.2f), 10);
-                float nh = Panels.Paragraph(note.transform, AlibiFlow.MenuNote, Theme.Sans, 15, Theme.Text, 14, 10, 472) + 20;
-                UI.Place(note.rectTransform, 0, y, 500, nh);
-                y += nh + 14;
-            }
-            int next = AlibiFlow.NextCard();
-            var nextCase = LevelCards.Card(next);
-            MenuButton(left, "Vazhdo", nextCase.Title + " · " + nextCase.Kicker.ToLowerInvariant(), "▶", true, () => AlibiFlow.StartCase(LevelCards.Card(next)), y);
-            y += 90;
-            MenuButton(left, "Kartat e niveleve", "Progresioni: Faza 1 deri në Fazën 4, me zgjidhje të verifikuara", "✧", false, ShowCards, y);
-            y += 90;
-            MenuButton(left, "Rast i ri", "Gjeneratori: raste të reja me zgjidhje të garantuar unike", "⚙", false, ShowNewCase, y);
-            y += 90;
-            MenuButton(left, "Si luhet", "Rregullat në një minutë", "?", false, ShowHowTo, y);
-            y += 90;
-            MenuButton(left, "Dil", "Mbyll lojën", "✕", false, Quit, y);
+            // Vinjete
+            BuildVignette(bg);
 
-            // Footer with progress bar feel
-            var foot = UI.Rect(screen, "Footer");
-            foot.anchorMin = foot.anchorMax = new Vector2(0, 0);
-            foot.pivot = new Vector2(0, 0);
-            foot.anchoredPosition = new Vector2(64, 24);
-            foot.sizeDelta = new Vector2(900, 76);
-            var footBg = foot.gameObject.AddComponent<Image>();
-            footBg.sprite = Theme.Rounded(8);
-            footBg.type = Image.Type.Sliced;
-            footBg.color = new Color(0.04f, 0.05f, 0.07f, 0.7f);
-            footBg.raycastTarget = false;
-            var progress = new List<string>();
-            for (int k = 1; k <= 4; k++)
-            {
-                string state = AlibiFlow.CardWon(k) ? AlibiFlow.BestStars(k) + "/3 yje" : AlibiFlow.CardUnlocked(k) ? "e hapur" : "e kyçur";
-                progress.Add("<color=#D2AD62>Karta " + k + "</color>: " + state);
-            }
-            UI.LabelAt(foot, "Progresi — " + string.Join(" · ", progress.ToArray()), Theme.Sans, 14, Theme.Text2, 14, 8, 870, 20);
-            UI.LabelAt(foot, "Grupi 6 · Dea Berisha · Nysret Ukaj · Aulon Miftari · Enis Dapko", Theme.Sans, 13, Theme.Muted, 14, 30, 870, 18);
-            UI.LabelAt(foot, "demo v0.2 · Unity · Alibi.Core (C# pa UnityEngine) + Alibi.Unity", Theme.Mono, 12, Theme.Dim, 14, 50, 870, 18);
+            // Rreze drite (prapa te gjithash)
+            BuildLightRays(bg);
 
-            var caption = UI.Rect(screen, "Caption");
-            caption.anchorMin = caption.anchorMax = new Vector2(1, 0);
-            caption.pivot = new Vector2(1, 0);
-            caption.anchoredPosition = new Vector2(-60, 40);
-            caption.sizeDelta = new Vector2(900, 24);
-            var ct = UI.Label(caption, "VILA · " + showcase.N + " TË DYSHUAR, " + showcase.RoomCount + " DHOMA, NJË GËNJESHTAR", Theme.Mono, 14, Theme.Muted, TextAnchor.MiddleRight);
-            UI.Stretch(ct.rectTransform, 0, 0, 0, 0);
+            // Silueta e detektivit (djathtas)
+            BuildDetective(bg);
+
+            // Paneli majtas: titulli + butonat
+            BuildLeft(bg);
+
+            // Grimca ari (mbi te gjitha)
+            BuildParticles(bg);
         }
 
-        RectTransform FullPanel(string kicker, string title, string intro)
+        // ==============================================================
+        //  VIGNETTE
+        // ==============================================================
+
+        void BuildVignette(RectTransform parent)
         {
-            UI.Clear(screen);
-            var bg = UI.Panel(screen, "Shade", new Color(0.03f, 0.04f, 0.06f, 0.9f), 0, true);
-            UI.Stretch(bg.rectTransform, 0, 0, 0, 0);
-            var body = UI.Rect(bg.transform, "Body");
-            UI.Stretch(body, 64, 48, 64, 40);
-            UI.LabelAt(body, kicker, Theme.Mono, 15, Theme.Gold, 0, 0, 900, 22);
-            UI.LabelAt(body, title, Theme.Serif, 54, Theme.Parchment, 0, 24, 1100, 64);
-            UI.LabelAt(body, intro, Theme.Sans, 18, Theme.Text2, 0, 92, 1150, 52);
-            var back = UI.Button(body, "Menyja", BtnStyle.Ghost, ShowHome, 16, 10);
-            UI.PlaceRight(back.Rect, 0, 6, 140, 46);
-            return body;
+            int s = 8;
+            var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
+            float r = s * 0.5f;
+            var px = new Color32[s * s];
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float dx = (x - r + 0.5f) / r;
+                    float dy = (y - r + 0.5f) / r;
+                    float d  = Mathf.Sqrt(dx * dx + dy * dy);
+                    byte a   = (byte)(Mathf.Clamp01(d - 0.15f) * 140);
+                    px[y * s + x] = new Color32(0, 0, 8, a);
+                }
+            tex.SetPixels32(px);
+            tex.Apply(false, true);
+            tex.filterMode = FilterMode.Bilinear;
+
+            var go = new GameObject("vignette");
+            go.transform.SetParent(parent, false);
+            var rt = go.AddComponent<RectTransform>();
+            Stretch(rt);
+            var ri = go.AddComponent<RawImage>();
+            ri.texture = tex;
+            ri.raycastTarget = false;
         }
 
-        void ShowCards()
+        // ==============================================================
+        //  RREZE DRITE (light rays — atmosfer noir)
+        // ==============================================================
+
+        void BuildLightRays(RectTransform parent)
         {
-            var body = FullPanel("KARTAT E NIVELEVE · PROGRESSION MAP", "Zgjidh kartën", "Katër karta me të njëjtën mekanikë. Vështirësia rritet përmes vendimeve: Faza 1 tabela, Faza 2 grafi, Faza 3 dëshmitari që gabon, Faza 4 kalimi i fshehtë.");
-            float cw = 420, gap = 18, y = 160;
-            for (int k = 1; k <= 4; k++)
+            var rayTex = RayGradientTex(64, 4);
+
+            float[] angles = { -55f, -38f, -22f, -5f, 12f, 28f };
+            float[] alphas = { 0.025f, 0.045f, 0.065f, 0.05f, 0.035f, 0.02f };
+            float[] widths = { 110f, 85f, 100f, 90f, 70f, 80f };
+
+            for (int i = 0; i < angles.Length; i++)
             {
-                int card = k;
-                var c = LevelCards.Card(k);
-                bool unlocked = AlibiFlow.CardUnlocked(k);
-                bool won = AlibiFlow.CardWon(k);
-                var box = UI.Card(body, "Card" + k, unlocked ? Theme.Panel : new Color(0.08f, 0.09f, 0.11f, 0.9f), won ? Theme.Gold : Theme.Line2, 14);
-                UI.Place(box.rectTransform, (k - 1) * (cw + gap), y, cw, 430);
-                var r = box.transform;
-                UI.LabelAt(r, c.Kicker, Theme.Mono, 13, Theme.Gold, 22, 20, cw - 44, 18);
-                UI.LabelAt(r, "Karta " + k, Theme.Serif, 36, Theme.Parchment, 22, 42, cw - 44, 48);
-                UI.LabelAt(r, c.Title.Substring(c.Title.IndexOf('—') + 1).Trim(), Theme.SansSemi, 17, Theme.Text, 22, 92, cw - 44, 24);
-                string config = c.N + " të dyshuar · " + c.RoomCount + " dhoma · " + c.T + " orë (" + c.Hours[0] + "–" + c.Hours[c.T - 1] + ") · buxhet " + c.Budget + " · par " + c.Par;
-                float iy = 124;
-                iy += Panels.Paragraph(r, config, Theme.Mono, 12, Theme.Text2, 22, iy, cw - 44) + 10;
-                iy += Panels.Paragraph(r, c.Objective, Theme.Sans, 14, Theme.Text2, 22, iy, cw - 44) + 10;
-                string skill = k == 1 ? "Aftësia: deklarata për vetveten nuk e përjashton dikë (R03, R04)." : k == 2 ? "Aftësia: koha + grafi — kush nuk arrin në dhomën e krimit përjashtohet (R02, R08)." : k == 3 ? "Aftësia: mos beso çdo kontradiktë — duhen dy mbështetje të pavarura (R05)." : "Aftësia: kërko dhomën për provën fizike; kalimi Biblioteka–Zyra hapet me R06.";
-                Panels.Paragraph(r, skill, Theme.Sans, 13, Theme.Muted, 22, iy, cw - 44);
-                string status = won ? "E fituar · " + AlibiFlow.BestStars(k) + "/3 yje" : unlocked ? "E hapur" : "E kyçur · fito Kartën " + (k - 1);
-                UI.LabelAt(r, status, Theme.SansSemi, 14, won ? Theme.GoldText : unlocked ? Theme.Text : Theme.Muted, 22, 372, 240, 30, TextAnchor.MiddleLeft);
-                var play = UI.Button(r, unlocked ? "Luaj" : "E kyçur", unlocked ? BtnStyle.Primary : BtnStyle.Disabled, () => AlibiFlow.StartCase(LevelCards.Card(card)), 16, 10);
-                UI.PlaceRight(play.Rect, 18, 362, 120, 48);
-                play.SetInteractable(unlocked);
+                var go = new GameObject("ray_" + i);
+                go.transform.SetParent(parent, false);
+                var rt = go.AddComponent<RectTransform>();
+
+                // Qendra: zona e detektivit (djathtas-lart)
+                rt.anchorMin = rt.anchorMax = new Vector2(0.72f, 0.62f);
+                rt.sizeDelta = new Vector2(widths[i], 2400f);
+                rt.localEulerAngles = new Vector3(0, 0, angles[i]);
+
+                var ri = go.AddComponent<RawImage>();
+                ri.texture = rayTex;
+                ri.color   = Theme.WithAlpha(Theme.Gold, alphas[i]);
+                ri.raycastTarget = false;
             }
-            y += 450;
-            float lw = (4 * cw + 3 * gap - gap) / 2f;
-            for (int i = 4; i < 6; i++)
-            {
-                var spec = LevelCards.Levels[i];
-                var box = UI.Card(body, "Level" + spec.Level, new Color(0.07f, 0.08f, 0.1f, 0.9f), Theme.Line, 12);
-                UI.Place(box.rectTransform, (i - 4) * (lw + gap), y, lw, 96);
-                UI.LabelAt(box.transform, "Niveli " + spec.Level + " · " + spec.Name, Theme.SansSemi, 17, Theme.Text2, 18, 14, lw - 36, 24);
-                UI.LabelAt(box.transform, spec.Unlocks + " Jashtë kësaj demoje; hapet pas Kartës 4.", Theme.Sans, 13, Theme.Muted, 18, 42, lw - 36, 44);
-            }
-            y += 116;
-            var unlock = UI.Button(body, AlibiFlow.UnlockAll ? "Demo: të gjitha kartat të hapura" : "Demo: hap të gjitha kartat", AlibiFlow.UnlockAll ? BtnStyle.ChipOn : BtnStyle.Ghost, () =>
-            {
-                AlibiFlow.UnlockAll = !AlibiFlow.UnlockAll;
-                ShowCards();
-            }, 15, 10);
-            UI.Place(unlock.Rect, 0, y, 300, 44);
-            var reset = UI.Button(body, "Rifillo progresin", BtnStyle.Ghost, () =>
-            {
-                AlibiFlow.ResetProgress();
-                ShowCards();
-            }, 15, 10);
-            UI.Place(reset.Rect, 312, y, 200, 44);
         }
 
-        void ShowNewCase()
+        // ==============================================================
+        //  SILUETA E DETEKTIVIT + LUPA
+        // ==============================================================
+
+        void BuildDetective(RectTransform parent)
         {
-            var body = FullPanel("RAST I RI · CASEGENERATOR", "Gjenero një rast", "Gjeneratori ndërton të vërtetën, zgjedh gënjeshtrën e fajtorit (LieSelector), kontrollon me zgjidhës që rasti të ketë saktësisht një zgjidhje dhe llogarit par-in me ParPolicy. Rastet me defekt refuzohen dhe hapet vetë seed-i tjetër.");
-            float cw = 420, gap = 18, y = 170;
+            // Kontejneri djathtas (58% e ekranit)
+            var box = SolidRect(parent, "detective_area", Color.clear);
+            box.anchorMin = new Vector2(0.42f, 0f);
+            box.anchorMax = Vector2.one;
+            box.offsetMin = box.offsetMax = Vector2.zero;
+
+            // Ambient glow prapa detektivit
+            var ambGo = new GameObject("ambient_glow");
+            ambGo.transform.SetParent(box, false);
+            var ambR = ambGo.AddComponent<RectTransform>();
+            ambR.anchorMin = ambR.anchorMax = new Vector2(0.45f, 0.52f);
+            ambR.sizeDelta = new Vector2(800, 900);
+            var ambRI = ambGo.AddComponent<RawImage>();
+            ambRI.texture = GlowTex(128);
+            ambRI.color   = new Color(0.824f, 0.678f, 0.384f, 0.06f);
+            ambRI.raycastTarget = false;
+
+            // Silueta e detektivit (polygon fill + rim light)
+            var detGo = new GameObject("detective");
+            detGo.transform.SetParent(box, false);
+            var detR = detGo.AddComponent<RectTransform>();
+            detR.anchorMin = new Vector2(0.02f, 0f);
+            detR.anchorMax = new Vector2(0.92f, 1f);
+            detR.offsetMin = detR.offsetMax = Vector2.zero;
+            var detRI = detGo.AddComponent<RawImage>();
+            detRI.texture = DetectiveSilhouetteTex(512);
+            detRI.raycastTarget = false;
+
+            // Lupa (SDF) — pozicionohet ne nivelin e fytyres
+            var glassGo = new GameObject("glass");
+            glassGo.transform.SetParent(box, false);
+            var glassR = glassGo.AddComponent<RectTransform>();
+            glassR.anchorMin = glassR.anchorMax = new Vector2(0.72f, 0.78f);
+            glassR.sizeDelta = new Vector2(240, 240);
+            var glassRI = glassGo.AddComponent<RawImage>();
+            glassRI.texture = MagnifyingGlassTex(256);
+            glassRI.raycastTarget = false;
+
+            // Glow i lentet (animohet)
+            var glowGo = new GameObject("lens_glow");
+            glowGo.transform.SetParent(box, false);
+            var glowR = glowGo.AddComponent<RectTransform>();
+            glowR.anchorMin = glowR.anchorMax = new Vector2(0.72f, 0.78f);
+            glowR.sizeDelta = new Vector2(240, 240);
+            _lensGlow           = glowGo.AddComponent<RawImage>();
+            _lensGlow.texture   = LensGlowTex(256);
+            _lensGlow.color     = Theme.WithAlpha(Theme.Gold, 0.22f);
+            _lensGlow.raycastTarget = false;
+        }
+
+        // ==============================================================
+        //  PANELI MAJTAS — TITULLI + BUTONAT
+        // ==============================================================
+
+        void BuildLeft(RectTransform parent)
+        {
+            var left = SolidRect(parent, "left", Color.clear);
+            left.anchorMin = new Vector2(0f, 0f);
+            left.anchorMax = new Vector2(0.42f, 1f);
+            left.offsetMin = left.offsetMax = Vector2.zero;
+
+            // ── Hije titulli (per thellesi) ──
+            var shadowGo = new GameObject("title_shadow");
+            shadowGo.transform.SetParent(left, false);
+            var shadowR = shadowGo.AddComponent<RectTransform>();
+            shadowR.anchorMin = new Vector2(0.12f, 0.68f);
+            shadowR.anchorMax = new Vector2(0.98f, 0.98f);
+            shadowR.offsetMin = new Vector2(5, -5);
+            shadowR.offsetMax = new Vector2(5, -5);
+            var shadowTxt        = shadowGo.AddComponent<Text>();
+            shadowTxt.text       = "A L I B I";
+            shadowTxt.font       = Theme.Serif;
+            shadowTxt.fontSize   = 148;
+            shadowTxt.color      = new Color(0, 0, 0, 0.50f);
+            shadowTxt.alignment  = TextAnchor.LowerLeft;
+            shadowTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            shadowTxt.verticalOverflow   = VerticalWrapMode.Overflow;
+            shadowTxt.raycastTarget = false;
+
+            // ── ALIBI — titulli kryesor ──
+            var titleGo = new GameObject("title");
+            titleGo.transform.SetParent(left, false);
+            var titleR = titleGo.AddComponent<RectTransform>();
+            titleR.anchorMin = new Vector2(0.12f, 0.68f);
+            titleR.anchorMax = new Vector2(0.98f, 0.98f);
+            titleR.offsetMin = titleR.offsetMax = Vector2.zero;
+
+            var titleTxt        = titleGo.AddComponent<Text>();
+            titleTxt.text       = "A L I B I";
+            titleTxt.font       = Theme.Serif;
+            titleTxt.fontSize   = 148;
+            titleTxt.color      = Theme.Parchment;
+            titleTxt.alignment  = TextAnchor.LowerLeft;
+            titleTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            titleTxt.verticalOverflow   = VerticalWrapMode.Overflow;
+
+            // Vije ari nen titull
+            var line = SolidRect(left, "gold_line", Theme.Gold);
+            line.anchorMin = new Vector2(0.12f, 0.660f);
+            line.anchorMax = new Vector2(0.56f, 0.666f);
+            line.offsetMin = line.offsetMax = Vector2.zero;
+
+            // Diamante dekorative ne skajet e vijes
+            var dL = SolidRect(left, "dL", Theme.Gold);
+            dL.anchorMin = dL.anchorMax = new Vector2(0.115f, 0.663f);
+            dL.sizeDelta = new Vector2(8, 8);
+            dL.localEulerAngles = new Vector3(0, 0, 45);
+
+            var dR = SolidRect(left, "dR", Theme.Gold);
+            dR.anchorMin = dR.anchorMax = new Vector2(0.565f, 0.663f);
+            dR.sizeDelta = new Vector2(8, 8);
+            dR.localEulerAngles = new Vector3(0, 0, 45);
+
+            // ── BUTONAT (me te mdhaja, font me bold) ──
+            string[] labels = {
+                "Vazhdo",
+                "Kartat e niveleve",
+                "Rast i ri",
+                "Si luhet",
+                "Dil"
+            };
+
+            float top = 0.63f;
+            float h   = 0.092f;    // shume me e larte
+            float gap = 0.018f;
+
+            for (int i = 0; i < labels.Length; i++)
+            {
+                float y = top - i * (h + gap);
+                BuildButton(left, labels[i], y, h, i);
+            }
+        }
+
+        // ── Nje buton i vetem (i madh, me kornize ari) ──
+        void BuildButton(RectTransform parent, string label, float yTop, float h, int idx)
+        {
+            var go = new GameObject("btn_" + idx);
+            go.transform.SetParent(parent, false);
+
+            var rt = go.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.12f, yTop - h);
+            rt.anchorMax = new Vector2(0.92f, yTop);
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+            // ── Korniza e arte (outline) ──
+            var border       = go.AddComponent<Image>();
+            border.sprite    = Theme.Rounded(20);
+            border.type      = Image.Type.Sliced;
+            border.color     = Theme.WithAlpha(Theme.Gold, 0.7f);
+
+            // ── Sfondi i erret brenda (me padding 2px per kornize) ──
+            var inner = new GameObject("inner");
+            inner.transform.SetParent(rt, false);
+            var innerR = inner.AddComponent<RectTransform>();
+            innerR.anchorMin = Vector2.zero;
+            innerR.anchorMax = Vector2.one;
+            innerR.offsetMin = new Vector2(2, 2);
+            innerR.offsetMax = new Vector2(-2, -2);
+            var innerBg       = inner.AddComponent<Image>();
+            innerBg.sprite    = Theme.Rounded(20);
+            innerBg.type      = Image.Type.Sliced;
+            innerBg.color     = new Color(0.06f, 0.06f, 0.08f, 0.96f);
+            innerBg.raycastTarget = false;
+
+            var labGo = new GameObject("lbl");
+            labGo.transform.SetParent(rt, false);
+            var labR = labGo.AddComponent<RectTransform>();
+            labR.anchorMin = new Vector2(0.045f, 0f);
+            labR.anchorMax = new Vector2(1f, 1f);
+            labR.offsetMin = labR.offsetMax = Vector2.zero;
+
+            var txt       = labGo.AddComponent<Text>();
+            txt.text      = label;
+            txt.font      = Theme.Serif;
+            txt.fontSize  = 28;                   // me e madhe
+            txt.color     = Theme.Parchment;
+            txt.alignment = TextAnchor.MiddleLeft;
+
+            var btn  = go.AddComponent<Button>();
+            var cols = btn.colors;
+            cols.normalColor      = Color.white;
+            cols.highlightedColor = new Color(0.85f, 0.78f, 0.55f, 0.18f);
+            cols.pressedColor     = new Color(0.85f, 0.78f, 0.55f, 0.35f);
+            cols.fadeDuration     = 0.12f;
+            btn.colors = cols;
+
+            int i = idx;
+            btn.onClick.AddListener(() => OnClick(i));
+        }
+
+        // ==============================================================
+        //  GRIMCA ARI (floating golden particles)
+        // ==============================================================
+
+        void BuildParticles(RectTransform parent)
+        {
+            _pRTs    = new RectTransform[PCount];
+            _pSpeeds = new float[PCount];
+            _pDrifts = new float[PCount];
+
+            var spr = CircleSprite();
+
+            for (int i = 0; i < PCount; i++)
+            {
+                var go = new GameObject("p" + i);
+                go.transform.SetParent(parent, false);
+                var rt = go.AddComponent<RectTransform>();
+
+                rt.anchorMin = rt.anchorMax = Vector2.zero;
+                rt.anchoredPosition = new Vector2(
+                    Random.Range(60f, 1860f),
+                    Random.Range(-50f, 1130f)
+                );
+
+                float sz = Random.Range(1.5f, 5f);
+                rt.sizeDelta = new Vector2(sz, sz);
+
+                var img = go.AddComponent<Image>();
+                img.sprite = spr;
+                img.color  = Theme.WithAlpha(Theme.Gold, Random.Range(0.08f, 0.35f));
+                img.raycastTarget = false;
+
+                _pRTs[i]    = rt;
+                _pSpeeds[i] = Random.Range(5f, 22f);
+                _pDrifts[i] = Random.Range(-2.5f, 2.5f);
+            }
+        }
+
+        // ==============================================================
+        //  LEVEL SELECT OVERLAY
+        // ==============================================================
+
+        void ShowLevelSelect()
+        {
+            if (_levelOverlay != null) return;
+
+            _levelOverlay = new GameObject("LevelOverlay");
+            _levelOverlay.transform.SetParent(_canvas.transform, false);
+
+            var bgR = _levelOverlay.AddComponent<RectTransform>();
+            Stretch(bgR);
+            var bgImg     = _levelOverlay.AddComponent<Image>();
+            bgImg.color   = new Color(0, 0, 0, 0.90f);
+
+            var closeBg = _levelOverlay.AddComponent<Button>();
+            closeBg.onClick.AddListener(CloseLevelSelect);
+
+            // Titull
+            var hdrGo = new GameObject("hdr");
+            hdrGo.transform.SetParent(bgR, false);
+            var hdrR = hdrGo.AddComponent<RectTransform>();
+            hdrR.anchorMin = new Vector2(0.2f, 0.72f);
+            hdrR.anchorMax = new Vector2(0.8f, 0.82f);
+            hdrR.offsetMin = hdrR.offsetMax = Vector2.zero;
+            var hdrTxt       = hdrGo.AddComponent<Text>();
+            hdrTxt.text      = "Zgjidh Nivelin";
+            hdrTxt.font      = Theme.Serif;
+            hdrTxt.fontSize  = 46;
+            hdrTxt.color     = Theme.Gold;
+            hdrTxt.alignment = TextAnchor.MiddleCenter;
+
+            // 4 karta ne rresht — me te mdhaja, me kornize ari
+            float cardW   = 0.18f;
+            float cardH   = 0.42f;
+            float totalW  = cardW * 4 + 0.03f * 3;
+            float startX  = 0.5f - totalW * 0.5f + cardW * 0.5f;
+
+            string[] names = { "Karta 1", "Karta 2", "Karta 3", "Karta 4" };
+
             for (int i = 0; i < 4; i++)
             {
-                int mode = i;
-                bool on = pickMode == i;
-                var b = UI.Button(body, null, on ? BtnStyle.ChipOn : BtnStyle.Chip, () =>
+                float cx = startX + i * (cardW + 0.03f);
+                BuildLevelCard(bgR, cx, 0.44f, cardW, cardH, names[i], i + 1);
+            }
+
+            // Buton mbyll (X)
+            var xGo = new GameObject("close_btn");
+            xGo.transform.SetParent(bgR, false);
+            var xR = xGo.AddComponent<RectTransform>();
+            xR.anchorMin = new Vector2(0.88f, 0.86f);
+            xR.anchorMax = new Vector2(0.93f, 0.92f);
+            xR.offsetMin = xR.offsetMax = Vector2.zero;
+
+            var xBg      = xGo.AddComponent<Image>();
+            xBg.sprite   = Theme.Rounded(8);
+            xBg.type     = Image.Type.Sliced;
+            xBg.color    = new Color(0.12f, 0.12f, 0.14f, 0.92f);
+
+            var xTxt       = new GameObject("xtxt").AddComponent<Text>();
+            xTxt.transform.SetParent(xR, false);
+            var xTxtR = xTxt.GetComponent<RectTransform>();
+            Stretch(xTxtR);
+            xTxt.text      = "✕";
+            xTxt.font      = Theme.Sans;
+            xTxt.fontSize  = 30;
+            xTxt.color     = Theme.Parchment;
+            xTxt.alignment = TextAnchor.MiddleCenter;
+
+            var xBtn = xGo.AddComponent<Button>();
+            xBtn.onClick.AddListener(CloseLevelSelect);
+        }
+
+        void BuildLevelCard(RectTransform parent, float cx, float cy,
+                            float w, float h, string title, int card)
+        {
+            var go = new GameObject("card_" + card);
+            go.transform.SetParent(parent, false);
+            var rt = go.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(cx - w * 0.5f, cy - h * 0.5f);
+            rt.anchorMax = new Vector2(cx + w * 0.5f, cy + h * 0.5f);
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+            // ── Korniza e arte (outline) ──
+            var border       = go.AddComponent<Image>();
+            border.sprite    = Theme.Rounded(20);
+            border.type      = Image.Type.Sliced;
+            border.color     = Theme.WithAlpha(Theme.Gold, 0.6f);
+
+            // ── Sfond i erret brenda ──
+            var inner = new GameObject("inner");
+            inner.transform.SetParent(rt, false);
+            var innerR = inner.AddComponent<RectTransform>();
+            innerR.anchorMin = Vector2.zero;
+            innerR.anchorMax = Vector2.one;
+            innerR.offsetMin = new Vector2(2, 2);
+            innerR.offsetMax = new Vector2(-2, -2);
+            var innerBg       = inner.AddComponent<Image>();
+            innerBg.sprite    = Theme.Rounded(20);
+            innerBg.type      = Image.Type.Sliced;
+            innerBg.color     = new Color(0.055f, 0.055f, 0.075f, 0.97f);
+            innerBg.raycastTarget = false;
+
+            // ── Ikone lupe (e vogel, dekorative) ──
+            var iconGo = new GameObject("icon");
+            iconGo.transform.SetParent(rt, false);
+            var iconR = iconGo.AddComponent<RectTransform>();
+            iconR.anchorMin = iconR.anchorMax = new Vector2(0.5f, 0.68f);
+            iconR.sizeDelta = new Vector2(64, 64);
+            var iconRI = iconGo.AddComponent<RawImage>();
+            iconRI.texture = MagnifyingGlassTex(128);
+            iconRI.color   = Theme.WithAlpha(Theme.Gold, 0.35f);
+            iconRI.raycastTarget = false;
+
+            // ── Numri i kartes (i madh, qendror) ──
+            var numGo = new GameObject("num");
+            numGo.transform.SetParent(rt, false);
+            var numR = numGo.AddComponent<RectTransform>();
+            numR.anchorMin = new Vector2(0.05f, 0.30f);
+            numR.anchorMax = new Vector2(0.95f, 0.60f);
+            numR.offsetMin = numR.offsetMax = Vector2.zero;
+            var numTxt       = numGo.AddComponent<Text>();
+            numTxt.text      = card.ToString();
+            numTxt.font      = Theme.Serif;
+            numTxt.fontSize  = 72;
+            numTxt.color     = Theme.WithAlpha(Theme.Gold, 0.12f);
+            numTxt.alignment = TextAnchor.MiddleCenter;
+            numTxt.raycastTarget = false;
+
+            // ── Titulli (i madh, font Serif) ──
+            var tGo = new GameObject("title");
+            tGo.transform.SetParent(rt, false);
+            var tR = tGo.AddComponent<RectTransform>();
+            tR.anchorMin = new Vector2(0.05f, 0.12f);
+            tR.anchorMax = new Vector2(0.95f, 0.45f);
+            tR.offsetMin = tR.offsetMax = Vector2.zero;
+            var tTxt       = tGo.AddComponent<Text>();
+            tTxt.text      = title;
+            tTxt.font      = Theme.Serif;
+            tTxt.fontSize  = 34;
+            tTxt.color     = Theme.Parchment;
+            tTxt.alignment = TextAnchor.MiddleCenter;
+
+            // ── Vije dekorative poshte ──
+            var cardLine = SolidRect(rt, "cline", Theme.WithAlpha(Theme.Gold, 0.3f));
+            cardLine.anchorMin = new Vector2(0.2f, 0.08f);
+            cardLine.anchorMax = new Vector2(0.8f, 0.09f);
+            cardLine.offsetMin = cardLine.offsetMax = Vector2.zero;
+
+            var btn  = go.AddComponent<Button>();
+            var cols = btn.colors;
+            cols.normalColor      = Color.white;
+            cols.highlightedColor = new Color(0.85f, 0.78f, 0.55f, 0.18f);
+            cols.pressedColor     = new Color(0.85f, 0.78f, 0.55f, 0.35f);
+            cols.fadeDuration     = 0.12f;
+            btn.colors = cols;
+
+            int c = card;
+            btn.onClick.AddListener(() => StartCard(c));
+        }
+
+        void CloseLevelSelect()
+        {
+            if (_levelOverlay != null)
+            {
+                Destroy(_levelOverlay);
+                _levelOverlay = null;
+            }
+        }
+
+        void StartCard(int card)
+        {
+            PlayerPrefs.SetInt("alibi_card", card);
+            PlayerPrefs.DeleteKey("alibi_newcase");
+            SceneManager.LoadScene("Alibi_Game");
+        }
+
+        // ==============================================================
+        //  NAVIGIMI
+        // ==============================================================
+
+        void OnClick(int idx)
+        {
+            switch (idx)
+            {
+                case 0: StartCard(1); break;
+                case 1: ShowLevelSelect(); break;
+                case 2:
+                    PlayerPrefs.SetInt("alibi_card", 1);
+                    PlayerPrefs.SetInt("alibi_newcase", 1);
+                    SceneManager.LoadScene("Alibi_Game");
+                    break;
+                case 3: ShowIntro(); break;
+                case 4:
+                    Application.Quit();
+#if UNITY_EDITOR
+                    UnityEditor.EditorApplication.isPlaying = false;
+#endif
+                    break;
+            }
+        }
+
+        void ShowIntro()
+        {
+            var introGo = new GameObject("_IntroReplay");
+            introGo.transform.SetParent(_canvas.transform, false);
+            introGo.AddComponent<IntroVideo>();
+        }
+
+        // ==============================================================
+        //  HELPERS — ndertim formash
+        // ==============================================================
+
+        RectTransform SolidRect(RectTransform parent, string name, Color color)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var r   = go.AddComponent<RectTransform>();
+            var img = go.AddComponent<Image>();
+            img.color = color;
+            img.raycastTarget = false;
+            return r;
+        }
+
+        void Stretch(RectTransform r)
+        {
+            r.anchorMin = Vector2.zero;
+            r.anchorMax = Vector2.one;
+            r.offsetMin = r.offsetMax = Vector2.zero;
+        }
+
+        // ==============================================================
+        //  TEXTURE: SILUETA E DETEKTIVIT me rim-light 3D
+        // ==============================================================
+
+        /// <summary>
+        /// Profili i detektivit si poligon (koordinata 0-1, y=0 poshte).
+        /// Fedora, kapuc i larte, pallto, hundë e dale — stil noir.
+        /// </summary>
+        static Vector2[] DetectiveProfile()
+        {
+            return new Vector2[] {
+                // ═══ MAJË E STREHËS SË KAPELËS (djathtas) ═══
+                new Vector2(0.73f, 0.825f),
+                // Streha lart
+                new Vector2(0.69f, 0.838f),
+                new Vector2(0.63f, 0.845f),
+                new Vector2(0.57f, 0.848f),
+                // Kurorë lart
+                new Vector2(0.55f, 0.86f),
+                new Vector2(0.53f, 0.89f),
+                new Vector2(0.51f, 0.925f),
+                // Maja e kapelës
+                new Vector2(0.47f, 0.95f),
+                new Vector2(0.41f, 0.958f),
+                new Vector2(0.36f, 0.952f),
+                // Kurorë prapa
+                new Vector2(0.33f, 0.935f),
+                new Vector2(0.30f, 0.90f),
+                new Vector2(0.28f, 0.865f),
+                // Streha prapa
+                new Vector2(0.26f, 0.848f),
+                new Vector2(0.23f, 0.838f),
+                new Vector2(0.21f, 0.828f),
+                // ═══ PRAPA KOKËS ═══
+                new Vector2(0.25f, 0.812f),
+                new Vector2(0.29f, 0.792f),
+                new Vector2(0.31f, 0.76f),
+                new Vector2(0.32f, 0.73f),
+                // ═══ QAFË ═══
+                new Vector2(0.325f, 0.695f),
+                new Vector2(0.32f, 0.665f),
+                // ═══ JAKA PRAPA (e ngritur lart) ═══
+                new Vector2(0.30f, 0.645f),
+                new Vector2(0.27f, 0.625f),
+                new Vector2(0.24f, 0.61f),
+                // ═══ SUP ═══
+                new Vector2(0.20f, 0.595f),
+                new Vector2(0.17f, 0.58f),
+                // ═══ SHPINA E PALLTOSË ═══
+                new Vector2(0.15f, 0.54f),
+                new Vector2(0.14f, 0.48f),
+                new Vector2(0.135f, 0.40f),
+                new Vector2(0.135f, 0.30f),
+                new Vector2(0.14f, 0.20f),
+                new Vector2(0.15f, 0.14f),
+                // ═══ FUNDI I PALLTOSË ═══
+                new Vector2(0.17f, 0.08f),
+                new Vector2(0.20f, 0.05f),
+                // ═══ BAZA ═══
+                new Vector2(0.57f, 0.05f),
+                new Vector2(0.60f, 0.08f),
+                // ═══ PARA E PALLTOSË (lart) ═══
+                new Vector2(0.58f, 0.16f),
+                new Vector2(0.57f, 0.26f),
+                new Vector2(0.56f, 0.36f),
+                new Vector2(0.555f, 0.44f),
+                new Vector2(0.55f, 0.52f),
+                // ═══ REVERE ═══
+                new Vector2(0.54f, 0.57f),
+                new Vector2(0.53f, 0.61f),
+                // ═══ JAKA PARA (e ngritur lart — stil detektivi) ═══
+                new Vector2(0.55f, 0.64f),
+                new Vector2(0.57f, 0.665f),
+                // ═══ MJEKRA ═══
+                new Vector2(0.59f, 0.695f),
+                new Vector2(0.61f, 0.715f),
+                // ═══ NOFULL ═══
+                new Vector2(0.63f, 0.735f),
+                new Vector2(0.65f, 0.75f),
+                // ═══ FAQE ═══
+                new Vector2(0.66f, 0.765f),
+                // ═══ HUNDË ═══
+                new Vector2(0.68f, 0.785f),
+                new Vector2(0.71f, 0.805f),
+                new Vector2(0.72f, 0.815f),   // maja e hundës
+                // ═══ KTHEHU TE STREHA ═══
+                new Vector2(0.70f, 0.82f),
+            };
+        }
+
+        /// <summary>Ray-casting point-in-polygon test.</summary>
+        static bool PointInPoly(float px, float py, Vector2[] poly)
+        {
+            bool inside = false;
+            int n = poly.Length;
+            for (int i = 0, j = n - 1; i < n; j = i++)
+            {
+                float yi = poly[i].y, yj = poly[j].y;
+                if ((yi > py) != (yj > py))
                 {
-                    pickMode = mode;
-                    ShowNewCase();
-                }, 16, 14);
-                UI.Place(b.Rect, i * (cw + gap), y, cw, 230);
-                UI.LabelAt(b.Rect, ModeNames[i], Theme.Serif, 28, Theme.Parchment, 18, 18, cw - 36, 40);
-                float iy = 66;
-                iy += Panels.Paragraph(b.Rect, ModeDesc[i], Theme.Sans, 15, Theme.Text, 18, iy, cw - 36) + 8;
-                Panels.Paragraph(b.Rect, ModeNotes[i], Theme.Sans, 13, Theme.Muted, 18, iy, cw - 36);
-                if (i == 2 || i == 3)
-                {
-                    var tag = UI.Card(b.Rect, "Tag", new Color(0, 0, 0, 0), Theme.WithAlpha(Theme.Gold, 0.6f), 12);
-                    UI.PlaceRight(tag.rectTransform, 16, 22, i == 2 ? 130 : 100, 26);
-                    var tt = UI.Label(tag.transform, i == 2 ? "eksperimental" : "karta 4", Theme.Sans, 13, Theme.GoldText, TextAnchor.MiddleCenter);
-                    UI.Stretch(tt.rectTransform, 0, 0, 0, 0);
+                    float xi = poly[i].x, xj = poly[j].x;
+                    if (px < xi + (py - yi) / (yj - yi) * (xj - xi))
+                        inside = !inside;
                 }
             }
-            y += 256;
-            var seedBox = UI.Card(body, "Seed", Theme.Panel, Theme.Line, 12);
-            UI.Place(seedBox.rectTransform, 0, y, 4 * cw + 3 * gap, 86);
-            UI.LabelAt(seedBox.transform, "SEED", Theme.Mono, 13, Theme.Muted, 22, 14, 200, 18);
-            UI.LabelAt(seedBox.transform, seed.ToString(), Theme.Mono, 30, Theme.Parchment, 22, 36, 200, 40);
-            var reroll = UI.Button(seedBox.transform, "Seed i ri", BtnStyle.Ghost, () =>
-            {
-                seed = UnityEngine.Random.Range(1000, 9999);
-                ShowNewCase();
-            }, 15, 10);
-            UI.Place(reroll.Rect, 180, 22, 140, 44);
-            UI.LabelAt(seedBox.transform, "I njëjti seed jep gjithmonë të njëjtin rast, prandaj rasti mund të riprodhohet dhe të luhet përsëri (T11).", Theme.Sans, 14, Theme.Muted, 340, 22, 900, 44, TextAnchor.MiddleLeft);
-            var go = UI.Button(seedBox.transform, "Gjenero rastin", BtnStyle.Primary, StartGeneration, 17, 10);
-            UI.PlaceRight(go.Rect, 22, 20, 220, 48);
+            return inside;
         }
 
-        void StartGeneration()
+        /// <summary>
+        /// Distanca nga pika (px,py) deri ne skajin me te afert
+        /// te poligonit. Kthen edhe piken me te afert (nearX, nearY).
+        /// </summary>
+        static float NearestEdgeDist(float px, float py, Vector2[] poly,
+                                      out float nearX, out float nearY)
         {
-            if (pickMode == 3)
+            float minSq = float.MaxValue;
+            nearX = px; nearY = py;
+            int n = poly.Length;
+
+            for (int i = 0, j = n - 1; i < n; j = i++)
             {
-                AlibiFlow.StartCase(LevelCards.Card4());
-                return;
+                float x1 = poly[j].x, y1 = poly[j].y;
+                float x2 = poly[i].x, y2 = poly[i].y;
+                float dx = x2 - x1, dy = y2 - y1;
+                float len2 = dx * dx + dy * dy;
+                float t = 0f;
+                if (len2 > 0.0001f)
+                    t = Mathf.Clamp01(((px - x1) * dx + (py - y1) * dy) / len2);
+                float projX = x1 + t * dx;
+                float projY = y1 + t * dy;
+                float dSq = (px - projX) * (px - projX) + (py - projY) * (py - projY);
+                if (dSq < minSq)
+                {
+                    minSq = dSq;
+                    nearX = projX;
+                    nearY = projY;
+                }
             }
-            int level = pickMode == 0 ? 1 : pickMode == 1 ? 2 : 3;
-            var type = pickMode == 2 ? CaseType.Sabotimi : CaseType.Vrasja;
-            int s = seed;
-            UI.Clear(overlay);
-            var shade = Panels.Overlay(overlay, "Generating");
-            var card = UI.Card(shade, "Card", Theme.Panel, Theme.Line2, 16);
-            Panels.Center(card.rectTransform, 760, 190);
-            UI.LabelAt(card.transform, "RAST I RI", Theme.Mono, 14, Theme.Gold, 30, 28, 700, 20);
-            UI.LabelAt(card.transform, "Gjeneratori po ndërton rastin…", Theme.Serif, 36, Theme.Parchment, 30, 52, 700, 46);
-            genStatus = UI.LabelAt(card.transform, "", Theme.Sans, 15, Theme.Text2, 30, 112, 700, 50);
-            genStarted = Time.time;
-            if (Application.platform == RuntimePlatform.WebGLPlayer)
-            {
-                var r = CaseGenerator.Generate(level, type, s);
-                genTask = Task.FromResult(r);
-            }
-            else
-            {
-                genTask = Task.Run(() => CaseGenerator.Generate(level, type, s));
-            }
+
+            return Mathf.Sqrt(minSq);
         }
 
-        void ShowHowTo()
+        /// <summary>
+        /// Gjeneron teksturën e siluetës me rim-light te arte per efekt 3D.
+        /// Polygon fill + ndricim direktiv nga djathtas/lart.
+        /// </summary>
+        static Texture2D DetectiveSilhouetteTex(int size)
         {
-            UI.Clear(overlay);
-            var iv = gameObject.AddComponent<IntroVideo>();
-            iv.Play(overlay, null, () =>
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            var poly = DetectiveProfile();
+            float s = size;
+            float invS = 1f / s;
+
+            // Parametra ndricimi
+            float rimWidth = 0.028f;    // gjeresia e rim-light (normalizuar)
+            float goldR = 0.824f, goldG = 0.678f, goldB = 0.384f;
+
+            for (int py = 0; py < size; py++)
             {
-                UI.Clear(overlay);
-                if (iv != null) Destroy(iv);
-            });
+                for (int px = 0; px < size; px++)
+                {
+                    float nx = (px + 0.5f) * invS;
+                    float ny = (py + 0.5f) * invS;
+
+                    // Kontrollo bbox per shpejtesi
+                    if (nx < 0.12f || nx > 0.74f || ny < 0.04f || ny > 0.97f)
+                        continue;
+
+                    if (!PointInPoly(nx, ny, poly))
+                        continue;
+
+                    // ── BRENDA SILUETËS ──
+                    float nrX, nrY;
+                    float eDist = NearestEdgeDist(nx, ny, poly, out nrX, out nrY);
+
+                    // Ngjyre baze: gri shume i erret me nuancë blu
+                    float bR = 0.052f, bG = 0.052f, bB = 0.068f;
+
+                    // ── RIM LIGHT (dritë nga djathtas + lart) ──
+                    if (eDist < rimWidth)
+                    {
+                        float rimStr = 1f - eDist / rimWidth;
+                        rimStr *= rimStr; // falloff kuadratik
+
+                        // Drejtimi: nga pikseli drejt skajit (jashtë)
+                        float dLen = Mathf.Max(eDist, 0.0005f);
+                        float outX = (nrX - nx) / dLen;
+                        float outY = (nrY - ny) / dLen;
+
+                        // Drita vjen nga djathtas (0.7) + pak lart (0.3)
+                        float lightDot = outX * 0.7f + outY * 0.3f;
+                        lightDot = Mathf.Clamp01(lightDot);
+
+                        float rimI = rimStr * lightDot * 0.7f;
+
+                        bR += goldR * rimI;
+                        bG += goldG * rimI;
+                        bB += goldB * rimI;
+
+                        // Dritë sekondare (fill) nga majtas — shumë e lehtë, blu
+                        float fillDot = Mathf.Clamp01(-outX * 0.3f - outY * 0.1f);
+                        float fillI = rimStr * fillDot * 0.06f;
+                        bR += 0.3f * fillI;
+                        bG += 0.4f * fillI;
+                        bB += 0.7f * fillI;
+                    }
+
+                    // ── BREZI I KAPELËS (shirit pak me i erret) ──
+                    if (ny > 0.842f && ny < 0.858f)
+                    {
+                        // Vetem brenda zonës së kapelës (jo hundë/fytyrë)
+                        if (nx > 0.22f && nx < 0.70f)
+                        {
+                            bR *= 0.55f;
+                            bG *= 0.55f;
+                            bB *= 0.55f;
+                        }
+                    }
+
+                    // ── SHKËLQIM I SYRIT (çarje e artë eliptike) ──
+                    float eyeX = 0.645f, eyeY = 0.792f;
+                    float edx = (nx - eyeX) / 0.016f;
+                    float edy = (ny - eyeY) / 0.004f;
+                    float eyeD = edx * edx + edy * edy;
+                    if (eyeD < 1f)
+                    {
+                        float eyeStr = (1f - eyeD);
+                        eyeStr = eyeStr * eyeStr * 0.45f;
+                        bR += goldR * eyeStr;
+                        bG += goldG * eyeStr;
+                        bB += goldB * eyeStr;
+                    }
+
+                    // Anti-alias ne skaj (1px feather)
+                    float edgePx = eDist * s;
+                    float alpha = Mathf.Clamp01(edgePx * 1.5f);
+
+                    pixels[py * size + px] = new Color(
+                        Mathf.Min(bR, 1f),
+                        Mathf.Min(bG, 1f),
+                        Mathf.Min(bB, 1f),
+                        alpha
+                    );
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply(false, true);
+            tex.filterMode = FilterMode.Bilinear;
+            return tex;
         }
 
-        void Quit()
+        // ==============================================================
+        //  TEXTURE: LUPA SDF
+        // ==============================================================
+
+        static Texture2D MagnifyingGlassTex(int size)
         {
-#if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-#else
-            Application.Quit();
-#endif
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            float s = size;
+
+            float cx = s * 0.52f, cy = s * 0.58f;
+            float outerR   = s * 0.30f;
+            float ringW    = s * 0.030f;
+            float innerR   = outerR - ringW;
+
+            float hAngle = -2.35f;
+            float cosA = Mathf.Cos(hAngle), sinA = Mathf.Sin(hAngle);
+            float hx1 = cx + cosA * outerR;
+            float hy1 = cy + sinA * outerR;
+            float hLen = s * 0.30f;
+            float hx2 = hx1 + cosA * hLen;
+            float hy2 = hy1 + sinA * hLen;
+            float hHalfW = s * 0.025f;
+
+            float gripR = s * 0.036f;
+
+            float goldR = 0.824f, goldG = 0.678f, goldB = 0.384f;
+
+            for (int py = 0; py < size; py++)
+            {
+                for (int px = 0; px < size; px++)
+                {
+                    float x = px + 0.5f, y = py + 0.5f;
+                    float dx = x - cx, dy = y - cy;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    float alpha = 0f;
+                    float bright = 1f;
+
+                    // Unaza
+                    float ringMid = outerR - ringW * 0.5f;
+                    float ringDist = Mathf.Abs(dist - ringMid) - ringW * 0.5f;
+                    float ringA = Mathf.Clamp01(1.5f - ringDist);
+
+                    if (ringA > 0.01f)
+                    {
+                        float ang = Mathf.Atan2(dy, dx);
+                        float hl  = Mathf.Clamp01(Mathf.Cos(ang - 0.5f));
+                        bright = 1f + hl * 0.35f;
+                    }
+
+                    // Lente
+                    float lensBorder = innerR - dist;
+                    float lensA = Mathf.Clamp01(lensBorder * 0.8f);
+                    float lensGrad = 1f - Mathf.Clamp01(dist / innerR);
+                    lensA *= lensGrad * 0.12f;
+
+                    // Dora
+                    float handleA = 0f;
+                    {
+                        float ldx = hx2 - hx1, ldy = hy2 - hy1;
+                        float len2 = ldx * ldx + ldy * ldy;
+                        float t = 0f;
+                        if (len2 > 0.001f)
+                            t = Mathf.Clamp01(((x - hx1) * ldx + (y - hy1) * ldy) / len2);
+                        float projX = hx1 + t * ldx;
+                        float projY = hy1 + t * ldy;
+                        float hDist = Mathf.Sqrt(
+                            (x - projX) * (x - projX) + (y - projY) * (y - projY));
+                        float w = Mathf.Lerp(hHalfW * 0.75f, hHalfW * 1.1f, t);
+                        handleA = Mathf.Clamp01(w - hDist + 1f);
+                    }
+
+                    // Grip
+                    float gDist = Mathf.Sqrt(
+                        (x - hx2) * (x - hx2) + (y - hy2) * (y - hy2));
+                    float gripA = Mathf.Clamp01(gripR - gDist + 1f);
+
+                    float solidA = Mathf.Max(ringA, Mathf.Max(handleA, gripA));
+                    alpha = Mathf.Max(solidA, lensA);
+
+                    float cr = Mathf.Min(1f, goldR * bright);
+                    float cg = Mathf.Min(1f, goldG * bright);
+                    float cb = Mathf.Min(1f, goldB * bright);
+
+                    pixels[py * size + px] = new Color(cr, cg, cb, alpha);
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply(false, true);
+            tex.filterMode = FilterMode.Bilinear;
+            return tex;
+        }
+
+        // ==============================================================
+        //  TEXTURE: GLOW, RAYS, CIRCLE
+        // ==============================================================
+
+        static Texture2D LensGlowTex(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var px  = new Color32[size * size];
+            float s = size;
+
+            float cx = s * 0.52f, cy = s * 0.58f;
+            float innerR = s * 0.30f - s * 0.030f;
+
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x + 0.5f - cx;
+                    float dy = y + 0.5f - cy;
+                    float d  = Mathf.Sqrt(dx * dx + dy * dy);
+                    float n  = d / innerR;
+                    float a = Mathf.Clamp01(1f - n);
+                    a = a * a * a;
+                    byte ab = (byte)(a * 255);
+                    px[y * size + x] = new Color32(255, 255, 255, ab);
+                }
+
+            tex.SetPixels32(px);
+            tex.Apply(false, true);
+            tex.filterMode = FilterMode.Bilinear;
+            return tex;
+        }
+
+        static Texture2D RayGradientTex(int w, int h)
+        {
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float fx = (float)x / (w - 1);
+                    float a  = 1f - Mathf.Abs(fx * 2f - 1f);
+                    a = a * a * a;
+                    tex.SetPixel(x, y, new Color(1, 1, 1, a));
+                }
+            tex.Apply(false, true);
+            tex.wrapMode   = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+            return tex;
+        }
+
+        static Sprite CircleSprite()
+        {
+            if (_circleSpr != null) return _circleSpr;
+
+            int s = 64;
+            var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
+            float r = s * 0.5f;
+            var px  = new Color32[s * s];
+
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float dx = x - r + 0.5f;
+                    float dy = y - r + 0.5f;
+                    float d  = Mathf.Sqrt(dx * dx + dy * dy);
+                    byte a   = (byte)(Mathf.Clamp01(r - d) * 255);
+                    px[y * s + x] = new Color32(255, 255, 255, a);
+                }
+
+            tex.SetPixels32(px);
+            tex.Apply(false, true);
+            _circleSpr = Sprite.Create(tex,
+                new Rect(0, 0, s, s), Vector2.one * 0.5f);
+            return _circleSpr;
+        }
+
+        /// <summary>Gradient radial per ambient glow.</summary>
+        static Texture2D GlowTex(int s)
+        {
+            var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
+            float r = s * 0.5f;
+            var px  = new Color32[s * s];
+
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float dx = (x - r + 0.5f) / r;
+                    float dy = (y - r + 0.5f) / r;
+                    float d  = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a  = Mathf.Clamp01(1f - d * d);
+                    byte ab  = (byte)(a * 255);
+                    px[y * s + x] = new Color32(255, 255, 255, ab);
+                }
+
+            tex.SetPixels32(px);
+            tex.Apply(false, true);
+            tex.filterMode = FilterMode.Bilinear;
+            return tex;
         }
     }
 }

@@ -128,6 +128,31 @@ namespace Alibi.Unity
             return go;
         }
 
+        // --- Cylinder helper for trees, lamp posts etc. ---
+        static GameObject Cylinder(Transform parent, string name, Vector3 center, float radius, float height, Material mat, bool addCollider = false)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = center;
+            go.transform.localScale = new Vector3(radius * 2f, height * 0.5f, radius * 2f);
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            if (!addCollider) UnityEngine.Object.Destroy(go.GetComponent<Collider>());
+            return go;
+        }
+
+        static GameObject Sphere(Transform parent, string name, Vector3 center, float radius, Material mat)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = center;
+            go.transform.localScale = Vector3.one * radius * 2f;
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            UnityEngine.Object.Destroy(go.GetComponent<Collider>());
+            return go;
+        }
+
         public static VillaView Build(Transform parent, CaseDefinition c)
         {
             var root = new GameObject("Vila");
@@ -136,9 +161,9 @@ namespace Alibi.Unity
             view.Case = c;
             var present = new HashSet<string>();
             foreach (var r in c.Rooms) present.Add(r.Id);
-            var wallMat = Theme.Lit(Theme.Hex("#5A4E42"), 0.08f);
-            var wallInnerMat = Theme.Lit(Theme.Hex("#8C7E6E"), 0.06f);
-            var ceilingMat = Theme.Lit(Theme.Hex("#6E6358"), 0.04f);
+            var wallMat = Theme.Lit(Theme.Hex("#7A6E60"), 0.10f);
+            var wallInnerMat = Theme.Lit(Theme.Hex("#B8A892"), 0.08f);
+            var ceilingMat = Theme.Lit(Theme.Hex("#A89880"), 0.06f);
             var capMat = Theme.Lit(Theme.Hex("#C2A673"), 0.2f);
             var plinthMat = Theme.Lit(Theme.Hex("#2B2A2E"), 0.05f);
             var stepMat = Theme.Lit(Theme.Hex("#7B6450"), 0.15f);
@@ -249,7 +274,10 @@ namespace Alibi.Unity
                     wallMat, wallInnerMat, capMat, doorMat, doorFrameMat, glassMat);
             }
 
-            // Ground plane
+            // Front door panel with proximity open/close
+            BuildFrontDoor(root.transform, doorMat, doorFrameMat);
+
+            // Ground plane — small plate under villa kept for floor catcher
             var basePlate = Box(root.transform, "Base",
                 new Vector3(bounds.center.x, -0.3f, bounds.center.z),
                 new Vector3(bounds.size.x + 4f, 0.4f, bounds.size.z + 4f), baseMat);
@@ -281,11 +309,241 @@ namespace Alibi.Unity
             view.CrimeLight.intensity = 0f;
             view.CrimeLight.shadows = LightShadows.Soft;
 
+            // =========== EXTERIOR ENVIRONMENT ===========
+            BuildExterior(root.transform, bounds);
+
             view.Bounds = bounds;
             view.BuildMarkers();
             view.SecretPassage = BuildSecretPassage(root.transform, present);
             if (view.SecretPassage != null) view.SecretPassage.SetActive(c.SecretEdgeActive);
             return view;
+        }
+
+        // ================================================================
+        //  BuildExterior — ground, sky enclosure, hedges, trees, moonlight
+        // ================================================================
+        static void BuildExterior(Transform root, Bounds villaBounds)
+        {
+            // Materials
+            var grassMat   = Theme.Lit(new Color(0.14f, 0.22f, 0.10f), 0.06f);
+            var skyMat     = Theme.Lit(new Color(0.04f, 0.05f, 0.10f), 0.02f);
+            var hedgeMat   = Theme.Lit(new Color(0.08f, 0.18f, 0.06f), 0.05f);
+            var trunkMat   = Theme.Lit(new Color(0.28f, 0.18f, 0.10f), 0.08f);
+            var canopyMat  = Theme.Lit(new Color(0.10f, 0.24f, 0.08f), 0.05f);
+            var gravelMat  = Theme.Lit(new Color(0.22f, 0.20f, 0.17f), 0.06f);
+            var fenceMat   = Theme.Lit(new Color(0.10f, 0.08f, 0.06f), 0.08f);
+            var stoneMat   = Theme.Lit(new Color(0.25f, 0.23f, 0.20f), 0.1f);
+
+            float cx = villaBounds.center.x;
+            float cz = villaBounds.center.z;
+
+            // --- Large ground plane (dark grass) ---
+            float groundSize = 120f;
+            var ground = Box(root, "ExtGround",
+                new Vector3(cx, -0.52f, cz),
+                new Vector3(groundSize, 0.04f, groundSize), grassMat);
+            ground.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+
+            // --- Invisible wall colliders to keep player from walking off ---
+            float wallDist = 55f;
+            float wallH = 35f;
+            var invisMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            invisMat.color = Color.clear;
+            invisMat.SetFloat("_Surface", 1f);
+            invisMat.renderQueue = 4000;
+
+            Box(root, "BoundN", new Vector3(cx, wallH * 0.5f, cz + wallDist), new Vector3(groundSize, wallH, 0.5f), invisMat, true)
+                .GetComponent<Renderer>().enabled = false;
+            Box(root, "BoundS", new Vector3(cx, wallH * 0.5f, cz - wallDist), new Vector3(groundSize, wallH, 0.5f), invisMat, true)
+                .GetComponent<Renderer>().enabled = false;
+            Box(root, "BoundE", new Vector3(cx + wallDist, wallH * 0.5f, cz), new Vector3(0.5f, wallH, groundSize), invisMat, true)
+                .GetComponent<Renderer>().enabled = false;
+            Box(root, "BoundW", new Vector3(cx - wallDist, wallH * 0.5f, cz), new Vector3(0.5f, wallH, groundSize), invisMat, true)
+                .GetComponent<Renderer>().enabled = false;
+
+            // --- Sky enclosure (dark blue walls + ceiling so no black void) ---
+            float skyDist = 80f;
+            float skyH = 32f;
+
+            // North sky wall
+            Box(root, "SkyN", new Vector3(cx, skyH * 0.5f, cz + skyDist),
+                new Vector3(skyDist * 2.2f, skyH, 0.3f), skyMat);
+            // South sky wall
+            Box(root, "SkyS", new Vector3(cx, skyH * 0.5f, cz - skyDist),
+                new Vector3(skyDist * 2.2f, skyH, 0.3f), skyMat);
+            // East sky wall
+            Box(root, "SkyE", new Vector3(cx + skyDist, skyH * 0.5f, cz),
+                new Vector3(0.3f, skyH, skyDist * 2.2f), skyMat);
+            // West sky wall
+            Box(root, "SkyW", new Vector3(cx - skyDist, skyH * 0.5f, cz),
+                new Vector3(0.3f, skyH, skyDist * 2.2f), skyMat);
+            // Sky ceiling
+            Box(root, "SkyCeiling", new Vector3(cx, skyH, cz),
+                new Vector3(skyDist * 2.2f, 0.3f, skyDist * 2.2f), skyMat);
+
+            // --- Hedge ring around the villa perimeter ---
+            float hedgeMargin = 8f;
+            float hedgeH = 1.6f;
+            float hedgeW = 0.8f;
+            float hx0 = villaBounds.min.x - hedgeMargin;
+            float hx1 = villaBounds.max.x + hedgeMargin;
+            float hz0 = villaBounds.min.z - hedgeMargin;
+            float hz1 = villaBounds.max.z + hedgeMargin;
+            float hedgeLenX = hx1 - hx0;
+            float hedgeLenZ = hz1 - hz0;
+            float hedgeY = hedgeH * 0.5f - 0.5f;
+
+            // North hedge
+            Box(root, "HedgeN", new Vector3(cx, hedgeY, hz1), new Vector3(hedgeLenX + hedgeW, hedgeH, hedgeW), hedgeMat);
+            // South hedge (gap for front gate)
+            float gateHalf = 2.5f;
+            float gateCx = Layout("HO").Center.x;
+            Box(root, "HedgeSW", new Vector3((hx0 + gateCx - gateHalf) * 0.5f, hedgeY, hz0),
+                new Vector3(gateCx - gateHalf - hx0, hedgeH, hedgeW), hedgeMat);
+            Box(root, "HedgeSE", new Vector3((gateCx + gateHalf + hx1) * 0.5f, hedgeY, hz0),
+                new Vector3(hx1 - gateCx - gateHalf, hedgeH, hedgeW), hedgeMat);
+            // Gate pillars
+            Box(root, "GatePillarL", new Vector3(gateCx - gateHalf, hedgeH * 0.5f, hz0),
+                new Vector3(0.5f, hedgeH + 0.6f, 0.5f), stoneMat);
+            Box(root, "GatePillarR", new Vector3(gateCx + gateHalf, hedgeH * 0.5f, hz0),
+                new Vector3(0.5f, hedgeH + 0.6f, 0.5f), stoneMat);
+            // East hedge
+            Box(root, "HedgeE", new Vector3(hx1, hedgeY, cz), new Vector3(hedgeW, hedgeH, hedgeLenZ), hedgeMat);
+            // West hedge
+            Box(root, "HedgeW", new Vector3(hx0, hedgeY, cz), new Vector3(hedgeW, hedgeH, hedgeLenZ), hedgeMat);
+
+            // --- Wrought iron fence on top of hedge (thin dark bars) ---
+            float fenceH = 0.9f;
+            float fenceT = 0.04f;
+            float fenceTopY = hedgeH + fenceH * 0.5f - 0.5f;
+            Box(root, "FenceN", new Vector3(cx, fenceTopY, hz1), new Vector3(hedgeLenX, fenceH, fenceT), fenceMat);
+            Box(root, "FenceE", new Vector3(hx1, fenceTopY, cz), new Vector3(fenceT, fenceH, hedgeLenZ), fenceMat);
+            Box(root, "FenceW", new Vector3(hx0, fenceTopY, cz), new Vector3(fenceT, fenceH, hedgeLenZ), fenceMat);
+            Box(root, "FenceSW", new Vector3((hx0 + gateCx - gateHalf) * 0.5f, fenceTopY, hz0),
+                new Vector3(gateCx - gateHalf - hx0, fenceH, fenceT), fenceMat);
+            Box(root, "FenceSE", new Vector3((gateCx + gateHalf + hx1) * 0.5f, fenceTopY, hz0),
+                new Vector3(hx1 - gateCx - gateHalf, fenceH, fenceT), fenceMat);
+
+            // --- Gravel path from gate to front door (HO room south edge) ---
+            var hall = Layout("HO");
+            float pathZ0 = hz0 - 0.3f;
+            float pathZ1 = hall.Z0;
+            float pathLen = pathZ1 - pathZ0;
+            float pathW = 3.0f;
+            Box(root, "GravelPath",
+                new Vector3(hall.Center.x, -0.48f, pathZ0 + pathLen * 0.5f),
+                new Vector3(pathW, 0.06f, pathLen), gravelMat);
+            // Path edge stones
+            Box(root, "PathEdgeL", new Vector3(hall.Center.x - pathW * 0.5f - 0.15f, -0.44f, pathZ0 + pathLen * 0.5f),
+                new Vector3(0.2f, 0.12f, pathLen), stoneMat);
+            Box(root, "PathEdgeR", new Vector3(hall.Center.x + pathW * 0.5f + 0.15f, -0.44f, pathZ0 + pathLen * 0.5f),
+                new Vector3(0.2f, 0.12f, pathLen), stoneMat);
+
+            // --- Trees around the property ---
+            float treeBaseY = -0.5f;
+            Vector3[] treePositions =
+            {
+                new Vector3(hx0 + 4f, treeBaseY, hz1 - 4f),     // NW corner
+                new Vector3(hx1 - 4f, treeBaseY, hz1 - 4f),     // NE corner
+                new Vector3(hx1 - 3f, treeBaseY, hz0 + 5f),     // SE
+                new Vector3(hx0 + 3f, treeBaseY, hz0 + 5f),     // SW
+                new Vector3(hx0 + 5f, treeBaseY, cz),           // W mid
+                new Vector3(hx1 - 5f, treeBaseY, cz + 4f),      // E mid
+                new Vector3(cx - 12f, treeBaseY, hz1 - 6f),      // N left
+                new Vector3(cx + 14f, treeBaseY, hz1 - 5f),      // N right
+            };
+
+            for (int i = 0; i < treePositions.Length; i++)
+            {
+                var tp = treePositions[i];
+                // Vary tree sizes
+                float trunkH = 3.5f + (i % 3) * 0.8f;
+                float trunkR = 0.18f + (i % 2) * 0.06f;
+                float canopyR = 2.0f + (i % 3) * 0.5f;
+
+                Cylinder(root, "Trunk" + i, new Vector3(tp.x, tp.y + trunkH * 0.5f, tp.z),
+                    trunkR, trunkH, trunkMat);
+                Sphere(root, "Canopy" + i, new Vector3(tp.x, tp.y + trunkH + canopyR * 0.6f, tp.z),
+                    canopyR, canopyMat);
+                // Additional canopy sphere for fuller look
+                Sphere(root, "Canopy" + i + "b",
+                    new Vector3(tp.x + canopyR * 0.3f, tp.y + trunkH + canopyR * 0.3f, tp.z - canopyR * 0.2f),
+                    canopyR * 0.75f, canopyMat);
+            }
+
+            // --- Bushes scattered near the villa ---
+            Vector3[] bushPositions =
+            {
+                new Vector3(hall.X0 - 2f, -0.3f, hall.Z0 + 1f),
+                new Vector3(hall.X1 + 2f, -0.3f, hall.Z0 + 1f),
+                new Vector3(hx1 - 2f, -0.3f, cz + 8f),
+                new Vector3(hx0 + 2f, -0.3f, cz - 3f),
+            };
+            for (int i = 0; i < bushPositions.Length; i++)
+            {
+                var bp = bushPositions[i];
+                float bushR = 0.7f + (i % 2) * 0.3f;
+                Sphere(root, "Bush" + i, bp, bushR, hedgeMat);
+            }
+
+            // --- Moonlight (directional light for the whole scene) ---
+            var moonGo = new GameObject("Moonlight");
+            moonGo.transform.SetParent(root, false);
+            moonGo.transform.localPosition = new Vector3(cx, 20f, cz);
+            moonGo.transform.localRotation = Quaternion.Euler(45f, -30f, 0f);
+            var moon = moonGo.AddComponent<Light>();
+            moon.type = LightType.Directional;
+            moon.color = new Color(0.65f, 0.70f, 0.85f);
+            moon.intensity = 0.75f;
+            moon.shadows = LightShadows.Soft;
+            moon.shadowStrength = 0.5f;
+
+            // --- Ambient fill light (soft warm from below/inside) ---
+            var ambGo = new GameObject("AmbientFill");
+            ambGo.transform.SetParent(root, false);
+            ambGo.transform.localPosition = new Vector3(cx, 15f, cz);
+            ambGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            var amb = ambGo.AddComponent<Light>();
+            amb.type = LightType.Directional;
+            amb.color = new Color(0.35f, 0.30f, 0.24f);
+            amb.intensity = 0.40f;
+            amb.shadows = LightShadows.None;
+
+            // --- Porch lamp at front door ---
+            var porchLampGo = new GameObject("PorchLamp");
+            porchLampGo.transform.SetParent(root, false);
+            porchLampGo.transform.localPosition = new Vector3(hall.Center.x, WallHeight - 0.4f, hall.Z0 - 0.3f);
+            var porchLight = porchLampGo.AddComponent<Light>();
+            porchLight.type = LightType.Point;
+            porchLight.color = new Color(1f, 0.85f, 0.55f);
+            porchLight.range = 10f;
+            porchLight.intensity = 1.5f;
+            porchLight.shadows = LightShadows.Soft;
+            // Lamp fixture (small box + sphere)
+            Box(root, "PorchFixture", new Vector3(hall.Center.x, WallHeight - 0.2f, hall.Z0 - 0.15f),
+                new Vector3(0.3f, 0.4f, 0.2f), Theme.Lit(Theme.Hex("#2A2420"), 0.1f));
+            Sphere(root, "PorchBulb", new Vector3(hall.Center.x, WallHeight - 0.5f, hall.Z0 - 0.15f),
+                0.08f, Theme.Lit(new Color(1f, 0.9f, 0.6f), 0.9f));
+
+            // --- Garden lamp posts along the path ---
+            for (int i = 0; i < 2; i++)
+            {
+                float side = (i == 0) ? -1f : 1f;
+                float lampX = hall.Center.x + side * (pathW * 0.5f + 1.2f);
+                float lampZ = (pathZ0 + pathZ1) * 0.5f;
+                Cylinder(root, "LampPost" + i, new Vector3(lampX, 0.5f, lampZ), 0.06f, 2.2f, fenceMat);
+                Sphere(root, "LampGlobe" + i, new Vector3(lampX, 1.7f, lampZ), 0.15f,
+                    Theme.Lit(new Color(1f, 0.9f, 0.6f, 0.8f), 0.8f));
+                var lpGo = new GameObject("PathLight" + i);
+                lpGo.transform.SetParent(root, false);
+                lpGo.transform.localPosition = new Vector3(lampX, 1.7f, lampZ);
+                var lp = lpGo.AddComponent<Light>();
+                lp.type = LightType.Point;
+                lp.color = new Color(1f, 0.85f, 0.5f);
+                lp.range = 7f;
+                lp.intensity = 0.8f;
+                lp.shadows = LightShadows.Soft;
+            }
         }
 
         static Material GlassMaterial()
@@ -400,6 +658,15 @@ namespace Alibi.Unity
                 }
             }
             cuts.Sort((a, b) => a.x.CompareTo(b.x));
+
+            // Front door cut on HO south exterior wall
+            if (exterior && room.Id == "HO" && !vertical && Mathf.Approximately(at, 0f))
+            {
+                float doorCx = Layout("HO").Center.x;
+                float doorHalfW = 1.0f;
+                cuts.Add(new Vector2(doorCx - doorHalfW, doorCx + doorHalfW));
+                cuts.Sort((a, b) => a.x.CompareTo(b.x));
+            }
 
             // Window cuts for exterior walls (not basement, not staircase)
             var windowCuts = new List<Vector2>();
@@ -624,6 +891,89 @@ namespace Alibi.Unity
                     : new Vector3(pillarLen, windowH, WallThickness);
                 Box(root, "WallPillar", center, size, wallMat, true);
             }
+        }
+
+        // ================================================================
+        //  BuildFrontDoor — pivoting door panel + proximity controller
+        // ================================================================
+        static void BuildFrontDoor(Transform root, Material doorMat, Material doorFrameMat)
+        {
+            var hall = Layout("HO");
+            float doorCx = hall.Center.x;
+            float doorW = 2.0f;
+            float doorZ = hall.Z0; // south wall at Z=0
+
+            // Pivot at left hinge edge of door
+            var pivot = new GameObject("FrontDoorPivot");
+            pivot.transform.SetParent(root, false);
+            pivot.transform.localPosition = new Vector3(doorCx - doorW * 0.5f, 0f, doorZ);
+
+            // Door panel (keeps its collider so it blocks the player when closed)
+            var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            panel.name = "FrontDoorPanel";
+            panel.transform.SetParent(pivot.transform, false);
+            panel.transform.localPosition = new Vector3(doorW * 0.5f, DoorHeight * 0.5f, 0f);
+            panel.transform.localScale = new Vector3(doorW - 0.12f, DoorHeight - 0.06f, 0.08f);
+            panel.GetComponent<Renderer>().sharedMaterial = doorMat;
+
+            // Door handle (front, outside = -Z direction)
+            var hf = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            hf.name = "HandleFront";
+            hf.transform.SetParent(pivot.transform, false);
+            hf.transform.localPosition = new Vector3(doorW - 0.3f, DoorHeight * 0.45f, -0.07f);
+            hf.transform.localScale = new Vector3(0.08f, 0.03f, 0.1f);
+            hf.GetComponent<Renderer>().sharedMaterial = doorFrameMat;
+            UnityEngine.Object.Destroy(hf.GetComponent<Collider>());
+
+            // Door handle (back, inside = +Z direction)
+            var hb = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            hb.name = "HandleBack";
+            hb.transform.SetParent(pivot.transform, false);
+            hb.transform.localPosition = new Vector3(doorW - 0.3f, DoorHeight * 0.45f, 0.07f);
+            hb.transform.localScale = new Vector3(0.08f, 0.03f, 0.1f);
+            hb.GetComponent<Renderer>().sharedMaterial = doorFrameMat;
+            UnityEngine.Object.Destroy(hb.GetComponent<Collider>());
+
+            // Proximity controller
+            var ctrl = pivot.AddComponent<FrontDoorController>();
+            ctrl.DoorCenter = new Vector3(doorCx, 1.0f, doorZ);
+            ctrl.TriggerRadius = 3.5f;
+        }
+    }
+
+    /// <summary>
+    /// Smoothly opens/closes the front door when the player walks near it.
+    /// Uses distance check against CameraRig.FpPosition each frame.
+    /// </summary>
+    public sealed class FrontDoorController : MonoBehaviour
+    {
+        public Vector3 DoorCenter;
+        public float TriggerRadius = 3.5f;
+        public float OpenAngle = -90f;   // negative = swings inward (into the hall)
+        public float Speed = 3.5f;
+
+        float currentAngle;
+        CameraRig cachedRig;
+
+        void Update()
+        {
+            if (cachedRig == null)
+            {
+                var rigs = FindObjectsByType<CameraRig>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+                if (rigs.Length > 0) cachedRig = rigs[0];
+                else return;
+            }
+
+            bool inRange = false;
+            if (cachedRig.Mode == CameraMode.FirstPerson || cachedRig.Mode == CameraMode.ThirdPerson)
+            {
+                float dist = Vector3.Distance(cachedRig.FpPosition, DoorCenter);
+                inRange = dist < TriggerRadius;
+            }
+
+            float target = inRange ? OpenAngle : 0f;
+            currentAngle = Mathf.Lerp(currentAngle, target, Time.deltaTime * Speed);
+            transform.localRotation = Quaternion.Euler(0f, currentAngle, 0f);
         }
     }
 
