@@ -331,7 +331,7 @@ namespace Alibi.Unity
                 {
                     rig.SetMode(CameraMode.TopDown);
                     if (playerBody != null) playerBody.gameObject.SetActive(true);
-                    SetCeilingsVisible(false);
+                    SetCeilingsVisible(true);
                 }
                 BuildCameraControls();
             }, 14, 8);

@@ -34,12 +34,13 @@ namespace Alibi.Unity
         public Transform PlayerBody;
 
         // Top-down (Pamje nga lart) settings
-        public float TopDownDistance = 5.0f;
-        public float TopDownPitch = 32f;
-        public float TopDownTargetHeight = 1.1f;
+        public float TopDownDistance = 2.4f;
+        public float TopDownShoulder = 0.55f;
+        public float TopDownHeight = 1.95f;
+        public float TopDownPitch = 10f;
         public float TopDownWallMargin = 0.35f;
         RoomView[] tdRooms;
-        Vector3 tdPos;
+        float tdBack, tdSide;
         bool tdHasPos;
 
         float currentYaw;
@@ -178,7 +179,7 @@ namespace Alibi.Unity
             }
             else if (Mode == CameraMode.TopDown)
             {
-                TopDownDistance = Mathf.Clamp(TopDownDistance / factor, 3f, 10f);
+                TopDownDistance = Mathf.Clamp(TopDownDistance / factor, 1.5f, 5f);
             }
             else
             {
@@ -306,31 +307,66 @@ namespace Alibi.Unity
         void ComputeTopDown(out Vector3 pos, out Quaternion rot)
         {
             var feet = fpPosition + Vector3.down * EyeHeight;
-            var lookTarget = feet + Vector3.up * TopDownTargetHeight;
-            var dir = Quaternion.Euler(TopDownPitch, fpYaw, 0f) * Vector3.back;
-            var desired = lookTarget + dir * TopDownDistance;
+            var yawRot = Quaternion.Euler(0f, fpYaw, 0f);
+            var forward = yawRot * Vector3.forward;
+            var right = yawRot * Vector3.right;
+            var head = feet + Vector3.up * TopDownHeight;
+
+            RaycastHit hit;
+            float side = TopDownShoulder;
+            if (Physics.SphereCast(head, 0.2f, right, out hit, side, ~0, QueryTriggerInteraction.Ignore))
+                side = Mathf.Max(0f, hit.distance - 0.05f);
+            var shoulder = head + right * side;
+
+            float back = TopDownDistance;
+            if (Physics.SphereCast(shoulder, 0.2f, -forward, out hit, back, ~0, QueryTriggerInteraction.Ignore))
+                back = Mathf.Max(0.3f, hit.distance - 0.05f);
 
             RoomLayout room;
-            if (FindRoom(feet, out room))
-            {
-                desired.x = Mathf.Clamp(desired.x, room.X0 + TopDownWallMargin, room.X1 - TopDownWallMargin);
-                desired.z = Mathf.Clamp(desired.z, room.Z0 + TopDownWallMargin, room.Z1 - TopDownWallMargin);
-                float maxY = room.Y + MapBuilder.WallHeight - 0.4f;
-                desired.y = Mathf.Min(desired.y, Mathf.Max(maxY, lookTarget.y + 1.0f));
-            }
+            if (FindRoom(feet, out room) && !InsideAnyRoom(shoulder - forward * back))
+                back = Mathf.Max(0.3f, back * ClipToRoom(shoulder, shoulder - forward * back, room));
 
+            float k = Mathf.Clamp01(Time.unscaledDeltaTime * 6f);
             if (!tdHasPos)
             {
-                tdPos = desired;
+                tdSide = side;
+                tdBack = back;
                 tdHasPos = true;
             }
             else
             {
-                tdPos = Vector3.Lerp(tdPos, desired, Mathf.Clamp01(Time.unscaledDeltaTime * 8f));
+                tdSide = side < tdSide ? side : Mathf.Lerp(tdSide, side, k);
+                tdBack = back < tdBack ? back : Mathf.Lerp(tdBack, back, k);
             }
 
-            pos = tdPos;
-            rot = Quaternion.LookRotation(lookTarget - pos);
+            pos = head + right * tdSide - forward * tdBack;
+            rot = Quaternion.Euler(TopDownPitch, fpYaw, 0f);
+        }
+
+        bool InsideAnyRoom(Vector3 p)
+        {
+            if (tdRooms == null) return false;
+            foreach (var rv in tdRooms)
+            {
+                if (rv == null) continue;
+                var l = rv.Layout;
+                if (p.x >= l.X0 && p.x <= l.X1 && p.z >= l.Z0 && p.z <= l.Z1
+                    && p.y > l.Y - 0.5f && p.y < l.Y + MapBuilder.WallHeight)
+                    return true;
+            }
+            return false;
+        }
+
+        float ClipToRoom(Vector3 from, Vector3 to, RoomLayout l)
+        {
+            float t = 1f;
+            var d = to - from;
+            float m = TopDownWallMargin;
+            if (d.x > 0.0001f) t = Mathf.Min(t, (l.X1 - m - from.x) / d.x);
+            else if (d.x < -0.0001f) t = Mathf.Min(t, (l.X0 + m - from.x) / d.x);
+            if (d.z > 0.0001f) t = Mathf.Min(t, (l.Z1 - m - from.z) / d.z);
+            else if (d.z < -0.0001f) t = Mathf.Min(t, (l.Z0 + m - from.z) / d.z);
+            return Mathf.Clamp01(t);
         }
 
         bool FindRoom(Vector3 feet, out RoomLayout layout)
