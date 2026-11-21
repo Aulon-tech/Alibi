@@ -487,15 +487,6 @@ namespace Alibi.Unity
                 UI.LabelAt(box.transform, C.Suspects[i].Role, Theme.Sans, 13, Theme.ParchMuted, 54, 31, sw - 58, 20);
             }
             iy += 72;
-            UI.LabelAt(root, "RREGULLAT E RASTIT", Theme.Mono, 12, Theme.ParchMuted, pad, iy, iw, 16);
-            iy += 22;
-            for (int i = 0; i < C.Rules.Count; i++)
-            {
-                UI.LabelAt(root, (i + 1) + ".", Theme.SansSemi, 15, Theme.ParchMuted, pad, iy, 26, 20);
-                iy += Panels.Paragraph(root, C.Rules[i], Theme.Sans, 15, Theme.ParchInk, pad + 26, iy, iw - 26) + 4;
-            }
-            iy += 6;
-            iy += Panels.Paragraph(root, "Objektivi: " + C.Objective, Theme.SansSemi, 15, Theme.ParchInk, pad, iy, iw) + 6;
             if (C.GeneratorNotes.Count > 0)
             {
                 string note = "Gjeneratori refuzoi " + C.GeneratorNotes.Count + " seed-e me defekt para se ta hapte këtë rast (p.sh. " + C.GeneratorNotes[0] + "). Ky rast ka një defekt dhe nuk llogaritet si humbje: rastet e tilla nuk i shfaqen lojtarit, sistemi hap vetë seed-in tjetër.";

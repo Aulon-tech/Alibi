@@ -1000,22 +1000,6 @@ namespace Alibi.Unity
         public void BuildMarkers()
         {
             Markers = new SuspectMarker[Case.N, Case.RoomCount];
-            for (int s = 0; s < Case.N; s++)
-            {
-                var color = Theme.Hex(Case.Suspects[s].ColorHex);
-                var lit = Theme.Lit(color, 0.35f);
-                var ghost = Theme.Ghost(Theme.WithAlpha(color, 0.34f));
-                var ringMat = Theme.Ghost(Theme.WithAlpha(color, 0.9f));
-                ringMat.mainTexture = Theme.Ring.texture;
-                var conflictMat = Theme.Ghost(new Color(0.95f, 0.35f, 0.3f, 1f));
-                conflictMat.mainTexture = Theme.Ring.texture;
-                for (int r = 0; r < Case.RoomCount; r++)
-                {
-                    var room = Rooms[r];
-                    var pos = Slot(room.Layout, s, Case.N);
-                    Markers[s, r] = SuspectMarker.Create(room.transform, this, s, r, pos, lit, ghost, ringMat, conflictMat);
-                }
-            }
         }
 
         public static Vector3 Slot(RoomLayout l, int index, int count)

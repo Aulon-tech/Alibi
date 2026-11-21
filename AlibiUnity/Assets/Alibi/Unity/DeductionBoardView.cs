@@ -254,6 +254,7 @@ namespace Alibi.Unity
                     else if (!dm.Possible[s, time, r]) st = MarkerState.Hidden;
                     else st = dm.Count[s, time] == 1 ? MarkerState.Confirmed : MarkerState.Possible;
                     var marker = villa.Markers[s, r];
+                    if (marker == null) continue;
                     bool conflict = conflictSuspects.Contains(s);
                     if (marker.State == st && marker.Conflict == conflict) continue;
                     var m = marker;
