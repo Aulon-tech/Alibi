@@ -251,11 +251,77 @@ namespace Alibi.Unity
                 new Vector3(0.11f, 0.012f, 0.04f), new Vector3(0.125f, 0.018f, 0.23f), beltMat);
         }
 
+        // Gjen një pikë të lirë në dhomë: larg mureve, jashtë mobiljeve dhe larg banorëve të tjerë.
+        // Mobiljet maten nga Renderer.bounds reale, prandaj nuk ka nevojë për pozicione me dorë.
+        static readonly List<Bounds> obstacleBuf = new List<Bounds>();
+
+        static Vector3 FreeSpot(VillaView view, RoomView rv, List<Vector3> used)
+        {
+            var l = rv.Layout;
+            float floorY = view.transform.TransformPoint(new Vector3(l.Center.x, l.Y, l.Center.z)).y;
+
+            // Gjithçka në dhomë: mobiljet, shkallët, parmakët. Filtri i lartësisë lë jashtë
+            // dyshemenë, tavanin, suvatimin dhe qilimat.
+            obstacleBuf.Clear();
+            foreach (var rend in rv.GetComponentsInChildren<Renderer>(true))
+            {
+                var b = rend.bounds;
+                if (b.max.y < floorY + 0.25f) continue;  // qilima, dysheme — nuk pengojnë
+                if (b.min.y > floorY + 2.0f) continue;   // llamba tavani — mbi kokë
+                obstacleBuf.Add(b);
+            }
+
+            const float Margin = 1.2f;   // larg mureve
+            const float Radius = 0.55f;  // gjerësia e figurës
+            float x0 = l.X0 + Margin, x1 = l.X1 - Margin;
+            float z0 = l.Z0 + Margin, z1 = l.Z1 - Margin;
+            if (x1 < x0) { x0 = x1 = l.Center.x; }
+            if (z1 < z0) { z0 = z1 = l.Center.z; }
+
+            var best = new Vector3(l.Center.x, l.Y, l.Center.z);
+            float bestScore = float.NegativeInfinity;
+            const int N = 11;
+
+            for (int i = 0; i < N; i++)
+            {
+                for (int j = 0; j < N; j++)
+                {
+                    float lx = Mathf.Lerp(x0, x1, i / (float)(N - 1));
+                    float lz = Mathf.Lerp(z0, z1, j / (float)(N - 1));
+                    var world = view.transform.TransformPoint(new Vector3(lx, l.Y + 0.9f, lz));
+
+                    float clear = 4f;
+                    foreach (var b in obstacleBuf)
+                    {
+                        float dx = Mathf.Max(Mathf.Max(b.min.x - world.x, world.x - b.max.x), 0f);
+                        float dz = Mathf.Max(Mathf.Max(b.min.z - world.z, world.z - b.max.z), 0f);
+                        float d2 = dx * dx + dz * dz;
+                        if (d2 < clear * clear) clear = Mathf.Sqrt(d2);
+                    }
+
+                    float score = Mathf.Min(clear, 2.0f);
+                    if (clear < Radius) score -= 10f;   // brenda mobiljes — shmange
+                    foreach (var u in used)
+                    {
+                        float d = Vector2.Distance(new Vector2(lx, lz), new Vector2(u.x, u.z));
+                        if (d < 1.6f) score -= (1.6f - d) * 4f;
+                    }
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        best = new Vector3(lx, l.Y, lz);
+                    }
+                }
+            }
+            return best;
+        }
+
         static void SpawnResidents(VillaView view, Transform parent, Kit kit, HouseLife life)
         {
             var c = view.Case;
             var rooms = HouseSpawns.Assign(c);
-            var perRoom = new int[c.RoomCount];
+            var taken = new Dictionary<int, List<Vector3>>();
             // Standard materials — NO emission/glow, lit by per-figure point light
             var skinMat = kit.Mat("#F5D4B0", 0.55f);   // warm peach skin, moderate sheen
             var shoeMat = kit.Mat("#2A2220", 0.4f);     // dark shoes
@@ -265,8 +331,10 @@ namespace Alibi.Unity
                 int r = rooms[s];
                 RoomView rv;
                 if (!view.Rooms.TryGetValue(r, out rv)) continue;
-                var pos = HouseSpawns.PositionIn(rv.Layout);
-                pos.x += 1.2f * perRoom[r]++;
+                List<Vector3> used;
+                if (!taken.TryGetValue(r, out used)) { used = new List<Vector3>(); taken[r] = used; }
+                var pos = FreeSpot(view, rv, used);
+                used.Add(pos);
                 var info = c.Suspects[s];
                 var go = new GameObject("Resident_" + info.Id);
                 go.transform.SetParent(parent, false);
