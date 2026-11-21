@@ -48,7 +48,7 @@ namespace Alibi.Unity
 
     public static class MapBuilder
     {
-        public const float WallHeight = 3.0f;
+        public const float WallHeight = 4.2f;
         public const float WallThickness = 0.2f;
         public const float UpperFloor = 3.4f;
         public const float DoorHeight = 2.4f;

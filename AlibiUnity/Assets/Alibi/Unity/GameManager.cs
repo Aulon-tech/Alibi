@@ -144,17 +144,22 @@ namespace Alibi.Unity
             go.transform.SetParent(transform, false);
             playerBody = go.transform;
 
+            var model = new GameObject("Model").transform;
+            model.SetParent(go.transform, false);
+
             var coatMat = Theme.Lit(Theme.Hex("#3A4256"), 0.35f);
             var skinMat = Theme.Lit(Theme.Hex("#F5D4B0"), 0.55f);
             var hairMat = Theme.Lit(Theme.Hex("#2A1E16"), 0.2f);
             var shoeMat = Theme.Lit(Theme.Hex("#1E1A18"), 0.4f);
-            HouseDressing.BuildHumanoidBody(go.transform, coatMat, skinMat, hairMat, shoeMat);
+            HouseDressing.BuildHumanoidBody(model, coatMat, skinMat, hairMat, shoeMat);
 
             var hatMat = Theme.Lit(Theme.Hex("#2B2622"), 0.25f);
             var bandMat = Theme.Lit(Theme.Hex("#8C6A3A"), 0.3f);
-            HouseDressing.Part(go.transform, PrimitiveType.Cylinder, "HatBrim", new Vector3(0, 1.76f, 0), new Vector3(0.40f, 0.008f, 0.40f), hatMat);
-            HouseDressing.Part(go.transform, PrimitiveType.Cylinder, "HatCrown", new Vector3(0, 1.83f, 0), new Vector3(0.29f, 0.07f, 0.29f), hatMat);
-            HouseDressing.Part(go.transform, PrimitiveType.Cylinder, "HatBand", new Vector3(0, 1.785f, 0), new Vector3(0.295f, 0.018f, 0.295f), bandMat);
+            HouseDressing.Part(model, PrimitiveType.Cylinder, "HatBrim", new Vector3(0, 1.76f, 0), new Vector3(0.40f, 0.008f, 0.40f), hatMat);
+            HouseDressing.Part(model, PrimitiveType.Cylinder, "HatCrown", new Vector3(0, 1.83f, 0), new Vector3(0.29f, 0.07f, 0.29f), hatMat);
+            HouseDressing.Part(model, PrimitiveType.Cylinder, "HatBand", new Vector3(0, 1.785f, 0), new Vector3(0.295f, 0.018f, 0.295f), bandMat);
+
+            go.AddComponent<PlayerWalkAnimator>().Setup(model);
 
             var lightGo = new GameObject("PlayerLight");
             lightGo.transform.SetParent(go.transform, false);
@@ -1220,6 +1225,65 @@ namespace Alibi.Unity
                 note = caseDef.Title + " u zgjidh me " + Session.Stars + (Session.Stars == 1 ? " yll." : " yje.");
             }
             AlibiFlow.ToMenu(note);
+        }
+    }
+
+    public sealed class PlayerWalkAnimator : MonoBehaviour
+    {
+        Transform model, legL, legR, armL, armR;
+        Vector3 lastPos;
+        float phase;
+        float moveAmount;
+
+        public void Setup(Transform modelRoot)
+        {
+            model = modelRoot;
+            legL = Group("LegL", new Vector3(-0.11f, 0.80f, 0f), "ThighL", "KneeL", "ShinL", "CalfL", "AnkleL", "FootL", "SoleL");
+            legR = Group("LegR", new Vector3(0.11f, 0.80f, 0f), "ThighR", "KneeR", "ShinR", "CalfR", "AnkleR", "FootR", "SoleR");
+            armL = Group("ArmL", new Vector3(-0.28f, 1.32f, 0f), "UpperArmL", "ElbowL", "ForearmL", "WristL", "HandL", "ThumbL");
+            armR = Group("ArmR", new Vector3(0.28f, 1.32f, 0f), "UpperArmR", "ElbowR", "ForearmR", "WristR", "HandR", "ThumbR");
+            lastPos = transform.position;
+        }
+
+        Transform Group(string name, Vector3 pivot, params string[] parts)
+        {
+            var p = new GameObject(name).transform;
+            p.SetParent(model, false);
+            p.localPosition = pivot;
+            foreach (var n in parts)
+            {
+                var t = model.Find(n);
+                if (t != null) t.SetParent(p, true);
+            }
+            return p;
+        }
+
+        void OnEnable()
+        {
+            lastPos = transform.position;
+        }
+
+        void Update()
+        {
+            if (model == null) return;
+            float dt = Time.unscaledDeltaTime;
+            if (dt <= 0f) return;
+
+            var delta = transform.position - lastPos;
+            delta.y = 0f;
+            lastPos = transform.position;
+            float speed = delta.magnitude / dt;
+            if (speed > 30f) speed = 0f;
+
+            moveAmount = Mathf.MoveTowards(moveAmount, Mathf.Clamp01(speed / 3f), dt * 6f);
+            if (moveAmount > 0.01f) phase += dt * (5f + speed * 0.9f);
+
+            float s = Mathf.Sin(phase) * moveAmount;
+            legL.localRotation = Quaternion.Euler(s * 32f, 0f, 0f);
+            legR.localRotation = Quaternion.Euler(-s * 32f, 0f, 0f);
+            armL.localRotation = Quaternion.Euler(-s * 26f, 0f, 0f);
+            armR.localRotation = Quaternion.Euler(s * 26f, 0f, 0f);
+            model.localPosition = new Vector3(0f, Mathf.Abs(Mathf.Cos(phase)) * 0.05f * moveAmount, 0f);
         }
     }
 }

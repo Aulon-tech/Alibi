@@ -34,11 +34,13 @@ namespace Alibi.Unity
         public Transform PlayerBody;
 
         // Top-down (Pamje nga lart) settings
-        public float TopDownDistance = 5.5f;
-        public float TopDownPitch = 42f;
-        public float TopDownMaxPitch = 80f;
+        public float TopDownDistance = 5.0f;
+        public float TopDownPitch = 32f;
         public float TopDownTargetHeight = 1.1f;
-        float tdPitch = -1f;
+        public float TopDownWallMargin = 0.35f;
+        RoomView[] tdRooms;
+        Vector3 tdPos;
+        bool tdHasPos;
 
         float currentYaw;
         float currentSize = 8f;
@@ -99,6 +101,7 @@ namespace Alibi.Unity
                     fpPitch = 0f;
                 }
             }
+            if (mode == CameraMode.TopDown) tdHasPos = false;
             transitioning = true;
             transitionT = 0f;
             transitionFrom = Cam.transform.position;
@@ -302,31 +305,51 @@ namespace Alibi.Unity
 
         void ComputeTopDown(out Vector3 pos, out Quaternion rot)
         {
-            var lookTarget = fpPosition + Vector3.down * (EyeHeight - TopDownTargetHeight);
+            var feet = fpPosition + Vector3.down * EyeHeight;
+            var lookTarget = feet + Vector3.up * TopDownTargetHeight;
+            var dir = Quaternion.Euler(TopDownPitch, fpYaw, 0f) * Vector3.back;
+            var desired = lookTarget + dir * TopDownDistance;
 
-            float needed = TopDownMaxPitch;
-            for (float p = TopDownPitch; p < TopDownMaxPitch; p += 6f)
+            RoomLayout room;
+            if (FindRoom(feet, out room))
             {
-                var testDir = Quaternion.Euler(p, fpYaw, 0f) * Vector3.back;
-                if (!Physics.SphereCast(lookTarget, 0.25f, testDir, out _, TopDownDistance, ~0, QueryTriggerInteraction.Ignore))
-                {
-                    needed = p;
-                    break;
-                }
+                desired.x = Mathf.Clamp(desired.x, room.X0 + TopDownWallMargin, room.X1 - TopDownWallMargin);
+                desired.z = Mathf.Clamp(desired.z, room.Z0 + TopDownWallMargin, room.Z1 - TopDownWallMargin);
+                float maxY = room.Y + MapBuilder.WallHeight - 0.4f;
+                desired.y = Mathf.Min(desired.y, Mathf.Max(maxY, lookTarget.y + 1.0f));
             }
 
-            float dt = Time.unscaledDeltaTime;
-            if (tdPitch < 0f) tdPitch = needed;
-            else if (needed > tdPitch) tdPitch = Mathf.Lerp(tdPitch, needed, Mathf.Clamp01(dt * 10f));
-            else tdPitch = Mathf.Lerp(tdPitch, needed, Mathf.Clamp01(dt * 3f));
+            if (!tdHasPos)
+            {
+                tdPos = desired;
+                tdHasPos = true;
+            }
+            else
+            {
+                tdPos = Vector3.Lerp(tdPos, desired, Mathf.Clamp01(Time.unscaledDeltaTime * 8f));
+            }
 
-            rot = Quaternion.Euler(tdPitch, fpYaw, 0f);
-            var dir = rot * Vector3.back;
-            float dist = TopDownDistance;
-            RaycastHit hit;
-            if (Physics.SphereCast(lookTarget, 0.25f, dir, out hit, TopDownDistance, ~0, QueryTriggerInteraction.Ignore))
-                dist = Mathf.Max(0.6f, hit.distance - 0.1f);
-            pos = lookTarget + dir * dist;
+            pos = tdPos;
+            rot = Quaternion.LookRotation(lookTarget - pos);
+        }
+
+        bool FindRoom(Vector3 feet, out RoomLayout layout)
+        {
+            if (tdRooms == null || tdRooms.Length == 0 || tdRooms[0] == null)
+                tdRooms = FindObjectsByType<RoomView>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            foreach (var rv in tdRooms)
+            {
+                if (rv == null) continue;
+                var l = rv.Layout;
+                if (feet.x >= l.X0 && feet.x <= l.X1 && feet.z >= l.Z0 && feet.z <= l.Z1
+                    && feet.y > l.Y - 1.5f && feet.y < l.Y + MapBuilder.WallHeight)
+                {
+                    layout = l;
+                    return true;
+                }
+            }
+            layout = default;
+            return false;
         }
 
         void UpdatePlayerBody()
